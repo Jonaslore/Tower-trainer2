@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Departure Sequencing Trainer</title>
+<style>
+body { font-family: Arial; margin: 20px; }
+.row { padding: 8px; border: 1px solid #ccc; margin: 5px; cursor: grab; }
+button { margin: 10px 0; padding: 10px; }
+.result { margin-top: 20px; font-weight: bold; white-space: pre-line; }
+</style>
+</head>
+
+<body>
+
+<h2>Departure Sequencing Trainer</h2>
+
+<button onclick="generate()">Generate Flights</button>
+<button onclick="calculate()">Calculate + Analyse</button>
+
+<div id="list"></div>
+
+<div class="result" id="result"></div>
+
+<script>
+let flights = [];
+
+function rand(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+function generate(){
+    flights = [];
+    const types = ["Light","Medium","Heavy","Jumbo"];
+    const routes = ["Left","Right","Mario"];
+
+    for(let i=0;i<6;i++){
+        flights.push({
+            id: "FL"+(i+1),
+            type: rand(types),
+            route: rand(routes)
+        });
+    }
+    render();
+}
+
+function render(){
+    let html = "";
+    flights.forEach((f,i)=>{
+        html += `<div class="row">${i+1}. ${f.id} | ${f.type} | ${f.route}</div>`;
+    });
+    document.getElementById("list").innerHTML = html;
+}
+
+// WAKE RULE
+function wake(a,b){
+    if(a.type=="Light" && (b.type=="Medium"||b.type=="Heavy")) return 2;
+    if(a.type=="Light" && b.type=="Jumbo") return 3;
+    if(a.type=="Medium" && (b.type=="Heavy"||b.type=="Jumbo")) return 2;
+    return 0;
+}
+
+// ROUTE RULE + VISUAL
+function route(a,b){
+    if(a.route=="Mario" || b.route=="Mario") return {delay:2, reason:"Mario = 2 min mandatory"};
+
+    if(a.route !== b.route){
+        return {delay:0, reason:"Visual Separation (Left ↔ Right)"};
+    }
+
+    return {delay:2, reason:"Same direction route separation"};
+}
+
+// SIMULATION WITH LOG
+function simulate(order){
+    let time = 0;
+    let log = [];
+
+    for(let i=1;i<order.length;i++){
+        let a = order[i-1];
+        let b = order[i];
+
+        let w = wake(a,b);
+        let r = route(a,b);
+
+        let delay = Math.max(w, r.delay);
+        time += delay;
+
+        let reason = "";
+
+        if(delay === 0){
+            reason = "No delay (Visual separation used)";
+        } else if(w > r.delay){
+            reason = "Wake turbulence rule dominant → +" + w + " min";
+        } else if(r.delay > w){
+            reason = r.reason + " → +" + r.delay + " min";
+        } else {
+            reason = "Combined constraint → +" + delay + " min";
+        }
+
+        log.push(`${a.id} → ${b.id}: ${reason}`);
+    }
+
+    return {time, log};
+}
+
+// BRUTE FORCE OPTIMAL
+function permute(arr){
+    if(arr.length <=1) return [arr];
+    let result = [];
+    for(let i=0;i<arr.length;i++){
+        let rest = arr.slice(0,i).concat(arr.slice(i+1));
+        for(let p of permute(rest)){
+            result.push([arr[i]].concat(p));
+        }
+    }
+    return result;
+}
+
+function calculate(){
+    if(flights.length > 7){
+        document.getElementById("result").innerText =
+        "Too many flights for brute force (max 7)";
+        return;
+    }
+
+    let perms = permute(flights);
+
+    let bestTime = 99999;
+    let best = null;
+    let bestLog = [];
+
+    for(let p of perms){
+        let sim = simulate(p);
+        if(sim.time < bestTime){
+            bestTime = sim.time;
+            best = p;
+            bestLog = sim.log;
+        }
+    }
+
+    let userSim = simulate(flights);
+
+    let output =
+`YOUR SEQUENCE TIME: ${userSim.time} min
+
+BEST POSSIBLE TIME: ${bestTime} min
+
+LOSS: ${userSim.time - bestTime} min
+
+--- DETAILED ANALYSIS ---
+${userSim.log.join("\n")}
+
+--- BEST SEQUENCE ---
+${best.map(f => f.id + " " + f.type + " " + f.route).join("\n")}
+`;
+
+    document.getElementById("result").innerText = output;
+}
+</script>
+
+</body>
+</html>
