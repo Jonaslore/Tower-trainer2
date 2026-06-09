@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Trainer V8 LIVE MODE</title>
+<title>ATC Trainer V8.1 CLEAN</title>
 
 <style>
 body{
@@ -29,21 +29,15 @@ button{
   border:2px solid #444;
   border-radius:10px;
   padding:12px;
-  display:flex;
-  flex-direction:column;
-  gap:6px;
   cursor:pointer;
-}
-
-select{
-  padding:5px;
-  background:#222;
-  color:white;
-  border:1px solid #555;
 }
 
 .bad{
   border-color:red !important;
+}
+
+.warn{
+  border-color:orange !important;
 }
 
 .good{
@@ -63,7 +57,7 @@ select{
 
 <body>
 
-<h2>ATC Trainer V8 – LIVE MODE</h2>
+<h2>ATC Trainer V8.1 – CLEAN MODE</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="check()">Check Optimal</button>
@@ -99,7 +93,7 @@ function dir(f){
   return "S";
 }
 
-// 🔥 MAX RULE COST
+// 🔥 MAX RULE
 function cost(a,b){
 
   const A=wake(a.type);
@@ -124,36 +118,6 @@ function total(arr){
   return t;
 }
 
-// ---------------- LIVE SCORE CALC ----------------
-function pairScore(a,b){
-  return cost(a,b);
-}
-
-// ---------------- SWAP SUGGESTION ----------------
-function suggestSwap(i){
-
-  let best=i;
-  let bestScore=pairScore(order[i],order[i+1]);
-
-  for(let j=0;j<order.length;j++){
-    if(j===i||j===i+1) continue;
-
-    let temp=[...order];
-    [temp[i],temp[j]]=[temp[j],temp[i]];
-
-    let s=0;
-    for(let k=0;k<temp.length-1;k++){
-      s+=cost(temp[k],temp[k+1]);
-    }
-
-    if(s<total(order)){
-      return "Swap "+order[i].id+" with "+order[j].id;
-    }
-  }
-
-  return "";
-}
-
 // ---------------- GENERATE ----------------
 function generate(){
 
@@ -175,7 +139,7 @@ function generate(){
   render();
 }
 
-// ---------------- RENDER (LIVE MODE) ----------------
+// ---------------- RENDER ----------------
 function render(){
 
   const list=document.getElementById("list");
@@ -186,23 +150,22 @@ function render(){
     const div=document.createElement("div");
     div.className="strip";
 
-    let score="";
+    let c="";
+
     if(i<order.length-1){
-      score="Next cost: "+cost(order[i],order[i+1]);
+      let s=cost(order[i],order[i+1]);
+
+      if(s>=3) c="bad";
+      else if(s===2) c="warn";
+      else c="good";
     }
 
-    let suggestion = suggestSwap(i);
-
-    if(i<order.length-1 && cost(order[i],order[i+1])>=2){
-      div.classList.add("bad");
-    }
+    div.classList.add(c);
 
     div.innerHTML=
       "<b>"+f.id+"</b><br>"+
       "RWY: "+f.rwy+" | "+f.type+"<br>"+
-      "Route: "+f.route+"<br>"+
-      score+
-      (suggestion ? "<br><span style='color:yellow'>"+suggestion+"</span>" : "");
+      "Route: "+f.route;
 
     div.onclick=()=>{
       if(selected===null) selected=i;
@@ -217,52 +180,44 @@ function render(){
   });
 }
 
-// ---------------- CHECK OPTIMAL ----------------
+// ---------------- CHECK ----------------
 function check(){
 
   let opt = optimal(order);
 
-  const list=document.getElementById("list");
-  list.innerHTML="";
-
-  order.forEach((f,i)=>{
-
-    const div=document.createElement("div");
-    div.className="strip";
-
-    let ok = order[i].id === opt[i].id;
-
-    div.classList.add(ok ? "best" : "bad");
-
-    div.innerHTML=
-      "<b>"+f.id+"</b><br>"+
-      "USER INT: "+f.intersection+"<br>"+
-      "OPT: "+opt[i].intersection;
-
-    list.appendChild(div);
-  });
-
-  const title=document.createElement("div");
-  title.innerHTML="<h3>OPTIMAL FLOW</h3>";
-  list.appendChild(title);
-
-  opt.forEach(f=>{
-    const div=document.createElement("div");
-    div.className="strip best";
-
-    div.innerHTML=
-      "<b>"+f.id+"</b><br>"+
-      f.type+" | "+f.route;
-
-    list.appendChild(div);
-  });
-
   result.innerText =
-`TOTAL COST
-User: ${total(order)}
+`RESULT
+
+Your cost: ${total(order)}
 Optimal: ${total(opt)}
 Diff: ${total(order)-total(opt)}`;
 
+}
+
+function optimal(arr){
+
+  let best=null;
+  let bestScore=999999;
+
+  function perm(a,cur=[]){
+    if(a.length===0){
+      let s=total(cur);
+      if(s<bestScore){
+        bestScore=s;
+        best=cur;
+      }
+      return;
+    }
+
+    for(let i=0;i<a.length;i++){
+      let copy=[...a];
+      let item=copy.splice(i,1)[0];
+      perm(copy,[...cur,item]);
+    }
+  }
+
+  perm(arr);
+  return best;
 }
 
 </script>
