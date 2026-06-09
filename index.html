@@ -29,29 +29,24 @@ button{
   border:1px solid #444;
   border-radius:10px;
   padding:12px;
-
-  display:flex;
-  flex-direction:column;
-
-  cursor:grab;
   user-select:none;
+  cursor:pointer;
 }
 
-.strip.dragging{
-  opacity:0.4;
+.strip.active{
+  border-color:#f1c40f;
 }
 
 .result{
   margin-top:20px;
   white-space:pre-line;
-  color:#ccc;
 }
 </style>
 </head>
 
 <body>
 
-<h2>ATC Trainer</h2>
+<h2>ATC Trainer (iPad Safe Mode)</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="evaluate()">Evaluate</button>
@@ -65,8 +60,9 @@ let flights = [];
 let order = [];
 
 const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ"];
+const types = ["A320","B738","A321","E190","A388","C130","GLEX","C56X"];
 
-const types = ["A320","B738","A321","E190","A388","C130","GLEX","C56X","EUROFIGHTER"];
+let selected = null;
 
 function rand(a){
   return a[Math.floor(Math.random()*a.length)];
@@ -85,7 +81,6 @@ function generate(){
   }
 
   order = [...flights];
-
   render();
 }
 
@@ -94,46 +89,29 @@ function render(){
   const list = document.getElementById("list");
   list.innerHTML = "";
 
-  order.forEach((f)=>{
+  order.forEach((f, index)=>{
 
     const div = document.createElement("div");
     div.className = "strip";
-    div.draggable = true;
 
-    div.dataset.id = f.id;
+    div.innerHTML = `<b>${f.id}</b><br>${f.type}`;
 
-    div.innerHTML = `
-<b>${f.id}</b>
-${f.type}
-`;
+    div.onclick = () => {
 
-    div.addEventListener("dragstart", ()=>{
-      div.classList.add("dragging");
-    });
+      if(selected === null){
+        selected = index;
+        div.classList.add("active");
+      } else {
 
-    div.addEventListener("dragend", ()=>{
-      div.classList.remove("dragging");
-    });
+        // swap
+        let temp = order[selected];
+        order[selected] = order[index];
+        order[index] = temp;
 
-    div.addEventListener("dragover", e=>{
-      e.preventDefault();
-    });
-
-    div.addEventListener("drop", e=>{
-      e.preventDefault();
-
-      const dragged = document.querySelector(".dragging");
-      const list = document.getElementById("list");
-
-      const nodes = [...list.children];
-
-      const from = nodes.indexOf(dragged);
-      const to = nodes.indexOf(div);
-
-      order.splice(to,0,order.splice(from,1)[0]);
-
-      render();
-    });
+        selected = null;
+        render();
+      }
+    };
 
     list.appendChild(div);
   });
