@@ -2,125 +2,23 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Simulator</title>
-
-<style>
-body{
-  font-family: Arial;
-  background:#111;
-  color:white;
-  padding:20px;
-}
-
-button{
-  padding:10px;
-  margin:10px 5px;
-}
-
-#list{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  max-width:600px;
-}
-
-.strip{
-  background:#1e1e1e;
-  border:1px solid #444;
-  border-radius:10px;
-  padding:12px;
-  cursor:pointer;
-  user-select:none;
-}
-
-.strip.active{
-  border-color:yellow;
-}
-
-.result{
-  margin-top:20px;
-  white-space:pre-line;
-}
-</style>
+<title>JS TEST</title>
 </head>
 
 <body>
 
-<h2>ATC Simulator</h2>
+<h1>JS TEST PAGE</h1>
 
-<button onclick="generate()">Generate</button>
-<button onclick="evaluate()">Evaluate</button>
-
-<div id="list"></div>
-
-<div class="result" id="result"></div>
+<button onclick="test()">CLICK ME</button>
 
 <script>
 
-let flights = [];
-let order = [];
-let selected = null;
+console.log("SCRIPT ACTIVE");
 
-const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ"];
-
-function rand(arr){
-  return arr[Math.floor(Math.random()*arr.length)];
+function test(){
+  alert("BUTTON WORKS");
 }
 
-// GENERATE FLIGHTS
-function generate(){
-
-  flights = [];
-  order = [];
-  selected = null;
-
-  for(let i=0;i<6;i++){
-    flights.push({
-      id: rand(airlines) + Math.floor(Math.random()*900)
-    });
-  }
-
-  order = [...flights];
-  render();
-}
-
-// RENDER LIST
-function render(){
-
-  const list = document.getElementById("list");
-  list.innerHTML = "";
-
-  order.forEach((f,index)=>{
-
-    const div = document.createElement("div");
-    div.className = "strip";
-
-    div.innerHTML = `<b>${f.id}</b>`;
-
-    div.onclick = ()=>{
-
-      if(selected === null){
-        selected = index;
-        div.classList.add("active");
-      } else {
-
-        let temp = order[selected];
-        order[selected] = order[index];
-        order[index] = temp;
-
-        selected = null;
-        render();
-      }
-    };
-
-    list.appendChild(div);
-  });
-}
-
-// EVALUATE
-function evaluate(){
-  alert("EVALUATE WURDE GEDRÜCKT");
-}
 </script>
 
 </body>
