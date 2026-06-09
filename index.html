@@ -51,6 +51,7 @@ button{
 
 <button onclick="generate()">Generate</button>
 <button onclick="evaluate()">Evaluate</button>
+<button onclick="checkOrder()">Check Optimal</button>
 
 <div id="list"></div>
 <div class="result" id="result"></div>
@@ -69,7 +70,7 @@ function rand(arr){
   return arr[Math.floor(Math.random()*arr.length)];
 }
 
-// WAKE CLASS
+// Wake classification
 function wake(type){
   if(type==="A388") return "JUMBO";
   if(type==="C130") return "HEAVY";
@@ -77,63 +78,26 @@ function wake(type){
   return "LIGHT";
 }
 
-// GENERATE
-function generate(){
+// Direction rules
+function direction(f){
 
-  order = [];
-  selected = null;
-
-  let rwy = rand(runways);
-
-  for(let i=0;i<6;i++){
-    order.push({
-      id: rand(airlines) + Math.floor(Math.random()*900),
-      type: rand(types),
-      rwy: rwy,
-      route: rand(routes)
-    });
+  if(f.rwy === "24"){
+    if(f.route === "NOKAR" || f.route === "MARIO") return "R";
+    return "L";
   }
 
-  render();
+  if(f.rwy === "06"){
+    if(f.route === "NOKAR") return "L";
+    if(f.route === "MARIO") return "S"; // straight
+    return "R";
+  }
+
+  return "S";
 }
 
-// RENDER STRIPS
-function render(){
-
-  const list = document.getElementById("list");
-  list.innerHTML = "";
-
-  order.forEach((f,index)=>{
-
-    const div = document.createElement("div");
-    div.className = "strip";
-
-    div.innerHTML =
-      "<b>" + f.id + "</b><br>" +
-      "Type: " + f.type + " | Wake: " + wake(f.type) + "<br>" +
-      "RWY: " + f.rwy + " | Route: " + f.route;
-
-    div.onclick = function(){
-
-      if(selected === null){
-        selected = index;
-        div.classList.add("active");
-      } else {
-
-        let temp = order[selected];
-        order[selected] = order[index];
-        order[index] = temp;
-
-        selected = null;
-        render();
-      }
-    };
-
-    list.appendChild(div);
-  });
-}
-
-// COST FUNCTION (ATC LIGHT)
+// --------------------
+// COST FUNCTION
+// --------------------
 function cost(a,b){
 
   let c = 0;
@@ -141,16 +105,21 @@ function cost(a,b){
   const A = wake(a.type);
   const B = wake(b.type);
 
-  // Wake turbulence
+  const dirA = direction(a);
+  const dirB = direction(b);
+
+  // WAKE TURBULENCE
   if(B==="LIGHT" && (A==="MEDIUM"||A==="HEAVY"||A==="JUMBO")) c += 2;
   if(B==="MEDIUM" && A==="HEAVY") c += 2;
-  if(B==="LIGHT" && A==="JUMBO") c += 3;
+  if(B==="HEAVY" && A==="JUMBO") c += 2;
+  if((B==="LIGHT"||B==="MEDIUM") && A==="JUMBO") c += 3;
 
-  // Runway
-  if(a.rwy === b.rwy) c += 1;
+  // RUNWAY / DIRECTION RULES
+  if(dirA === dirB && dirA !== "S") c += 2;
 
-  // Route congestion
-  if(a.route === b.route) c += 1;
+  // straight aircraft penalty (MARIO RWY06)
+  if(dirA === "S") c += 2;
+  if(dirB === "S") c += 2;
 
   return c;
 }
@@ -164,7 +133,7 @@ function totalCost(arr){
   return sum;
 }
 
-// SIMPLE OPTIMAL (greedy)
+// GREEDY OPTIMIZER
 function greedyBest(arr){
 
   let remaining = [...arr];
@@ -193,7 +162,69 @@ function greedyBest(arr){
   return result;
 }
 
+// --------------------
+// GENERATE
+// --------------------
+function generate(){
+
+  order = [];
+  selected = null;
+
+  let rwy = rand(runways);
+
+  for(let i=0;i<6;i++){
+    order.push({
+      id: rand(airlines) + Math.floor(Math.random()*900),
+      type: rand(types),
+      rwy: rwy,
+      route: rand(routes)
+    });
+  }
+
+  render(order);
+}
+
+// --------------------
+// RENDER
+// --------------------
+function render(data){
+
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  data.forEach((f,index)=>{
+
+    const div = document.createElement("div");
+    div.className = "strip";
+
+    div.innerHTML =
+      "<b>" + f.id + "</b><br>" +
+      "Type: " + f.type + " | Wake: " + wake(f.type) + "<br>" +
+      "RWY: " + f.rwy + " | Route: " + f.route;
+
+    div.onclick = function(){
+
+      if(selected === null){
+        selected = index;
+        div.classList.add("active");
+      } else {
+
+        let temp = order[selected];
+        order[selected] = order[index];
+        order[index] = temp;
+
+        selected = null;
+        render(order);
+      }
+    };
+
+    list.appendChild(div);
+  });
+}
+
+// --------------------
 // EVALUATE
+// --------------------
 function evaluate(){
 
   if(order.length === 0){
@@ -219,6 +250,61 @@ Best cost: ${bestCost}
 Difference: +${diff}
 
 Rating: ${rating}`;
+}
+
+// --------------------
+// POSITION SCORE
+// --------------------
+function positionScore(arr, index){
+  if(index === arr.length - 1) return 0;
+  return cost(arr[index], arr[index + 1]);
+}
+
+// --------------------
+// CHECK OPTIMAL (VISUAL)
+// --------------------
+function checkOrder(){
+
+  if(order.length === 0){
+    document.getElementById("result").innerText = "Press Generate first.";
+    return;
+  }
+
+  let best = greedyBest([...order]);
+
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  order.forEach((f, index)=>{
+
+    const div = document.createElement("div");
+    div.className = "strip";
+
+    let userScore = positionScore(order, index);
+    let bestScore = positionScore(best, index);
+
+    let ok = userScore <= bestScore;
+
+    div.style.borderColor = ok ? "lime" : "red";
+
+    div.innerHTML =
+      "<b>" + f.id + "</b><br>" +
+      "Type: " + f.type + " | Wake: " + wake(f.type) + "<br>" +
+      "RWY: " + f.rwy + " | Route: " + f.route + "<br>" +
+      "Delay: " + userScore + " | Best: " + bestScore;
+
+    list.appendChild(div);
+  });
+
+  let userCost = totalCost(order);
+  let bestCost = totalCost(best);
+
+  document.getElementById("result").innerText =
+`CHECK RESULT
+
+Your cost: ${userCost}
+Best cost: ${bestCost}
+Difference: ${userCost - bestCost}`;
 }
 
 </script>
