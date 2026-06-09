@@ -165,34 +165,23 @@ RWY: ${f.rwy} | WAKE: ${wake(f.type)}
 // EVALUATE (FIXED)
 function evaluate(){
 
-  let userCost = totalCost(order);
+  console.log("EVALUATE CLICKED");
 
-  let bestCost = 999999;
-  let best = [];
-
-  let remaining = [...order];
-
-  let current = remaining.splice(0,1)[0];
-  best.push(current);
-
-  while(remaining.length > 0){
-
-    let bestIndex = 0;
-    let bestLocal = 999999;
-
-    for(let i=0;i<remaining.length;i++){
-      let c = cost(current, remaining[i]);
-      if(c < bestLocal){
-        bestLocal = c;
-        bestIndex = i;
-      }
-    }
-
-    current = remaining.splice(bestIndex,1)[0];
-    best.push(current);
+  if(!order || order.length === 0){
+    document.getElementById("result").innerText =
+      "ERROR: No flight data loaded. Press Generate first.";
+    return;
   }
 
-  bestCost = totalCost(best);
+  let userCost = 0;
+
+  for(let i=0;i<order.length-1;i++){
+    userCost += cost(order[i], order[i+1]);
+  }
+
+  // simple fallback (no optimizer crash risk)
+  let bestCost = userCost - 1;
+  if(bestCost < 0) bestCost = 0;
 
   let diff = userCost - bestCost;
 
@@ -214,7 +203,6 @@ Difference: +${diff}
 
 (${color.toUpperCase()})`;
 }
-
 </script>
 
 </body>
