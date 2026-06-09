@@ -203,44 +203,7 @@ function greedyBest(arr){
 // EVALUATE
 // EVALUATE
 function evaluate(){
-
-  console.log("EVALUATE CLICKED", order);
-
-  if(!order || order.length === 0){
-    document.getElementById("result").innerText =
-      "ERROR: No flights found. Please press Generate.";
-    return;
-  }
-
-  let userCost = totalCost(order);
-
-  let best = greedyBest([...order]);
-  let bestCost = totalCost(best);
-
-  let diff = userCost - bestCost;
-
-  let rating = "GOOD";
-  if(diff > 2) rating = "MID";
-  if(diff > 5) rating = "BAD";
-
-  // 🔥 VISUAL FEEDBACK (WICHTIG!)
-  document.querySelectorAll(".strip").forEach(el=>{
-    el.style.borderColor =
-      rating === "GOOD" ? "#2ecc71" :
-      rating === "MID" ? "#f1c40f" :
-      "#e74c3c";
-  });
-
-  document.getElementById("result").innerText =
-`RESULT
-
-Flights: ${order.length}
-
-Your cost: ${userCost}
-Best cost: ${bestCost}
-Difference: +${diff}
-
-Rating: ${rating}`;
+  alert("TEST OK");
 }
 </script>
 </body>
