@@ -21,7 +21,7 @@ button{
   display:flex;
   flex-direction:column;
   gap:10px;
-  max-width:750px;
+  max-width:800px;
 }
 
 .strip{
@@ -32,6 +32,17 @@ button{
   cursor:pointer;
   user-select:none;
   line-height:1.4;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+select{
+  margin-top:5px;
+  padding:5px;
+  background:#222;
+  color:white;
+  border:1px solid #555;
 }
 
 .result{
@@ -61,13 +72,19 @@ const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
 const types = ["A320","A321","B738","E190","A388","C130","GLEX","C56X","EUROFIGHTER"];
 const runways = ["06","24"];
 const routes = ["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
+
 const intersections = ["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"];
 
+// ------------------
+// RANDOM
+// ------------------
 function rand(arr){
   return arr[Math.floor(Math.random()*arr.length)];
 }
 
+// ------------------
 // WAKE
+// ------------------
 function wake(type){
   if(type==="A388") return "JUMBO";
   if(type==="C130") return "HEAVY";
@@ -75,12 +92,16 @@ function wake(type){
   return "LIGHT";
 }
 
+// ------------------
 // MILITARY
+// ------------------
 function isMilitary(f){
   return f.type === "EUROFIGHTER" || f.type === "C130";
 }
 
-// DIRECTION RULES
+// ------------------
+// DIRECTION
+// ------------------
 function direction(f){
 
   if(f.rwy === "24"){
@@ -97,23 +118,27 @@ function direction(f){
   return "S";
 }
 
-// INTERSECTION RULES
+// ------------------
+// INTERSECTION MODEL
+// ------------------
 function intersectionInfo(f){
 
   if(f.rwy === "06"){
     if(["A1","A2"].includes(f.intersection)) return {base:2,type:"STD"};
-    if(["B1","B2","A3","A4"].includes(f.intersection)) return {base:3,type:"INT"};
+    if(["A3","A4","B1","B2"].includes(f.intersection)) return {base:3,type:"INT"};
   }
 
   if(f.rwy === "24"){
     if(["A8","A9","B5"].includes(f.intersection)) return {base:2,type:"STD"};
-    if(["B4","A6"].includes(f.intersection)) return {base:3,type:"INT"};
+    if(["A6","B4"].includes(f.intersection)) return {base:3,type:"INT"};
   }
 
   return {base:2,type:"STD"};
 }
 
-// VALIDITY
+// ------------------
+// VALIDATION
+// ------------------
 function validIntersection(f){
   if(f.intersection.startsWith("B") && !isMilitary(f)){
     return false;
@@ -121,7 +146,19 @@ function validIntersection(f){
   return true;
 }
 
-// COST
+// ------------------
+// INTERSECTION COST (PER FLIGHT)
+// ------------------
+function intersectionCost(f){
+  const i = intersectionInfo(f);
+  let c = i.base;
+  if(i.type === "INT") c += 1;
+  return c;
+}
+
+// ------------------
+// MAIN COST
+// ------------------
 function cost(a,b){
 
   let c = 0;
@@ -138,28 +175,25 @@ function cost(a,b){
   if(B==="HEAVY" && A==="JUMBO") c += 2;
   if((B==="LIGHT"||B==="MEDIUM") && A==="JUMBO") c += 3;
 
-  // DIRECTION
+  // DIRECTION RULES
   if(dirA === dirB && dirA !== "S") c += 2;
   if(dirA === "S") c += 2;
   if(dirB === "S") c += 2;
 
-  // INTERSECTION COST
-  const Aint = intersectionInfo(a);
-  const Bint = intersectionInfo(b);
+  // INTERSECTION
+  c += intersectionCost(a);
+  c += intersectionCost(b);
 
-  c += Aint.base;
-  c += Bint.base;
-
-  if(Aint.type === "INT") c += 1;
-  if(Bint.type === "INT") c += 1;
-
+  // INVALID PENALTY
   if(!validIntersection(a)) c += 5;
   if(!validIntersection(b)) c += 5;
 
   return c;
 }
 
-// TOTAL
+// ------------------
+// TOTAL COST
+// ------------------
 function totalCost(arr){
   let sum = 0;
   for(let i=0;i<arr.length-1;i++){
@@ -168,7 +202,9 @@ function totalCost(arr){
   return sum;
 }
 
+// ------------------
 // GREEDY OPT
+// ------------------
 function greedyBest(arr){
 
   let remaining = [...arr];
@@ -197,7 +233,9 @@ function greedyBest(arr){
   return result;
 }
 
+// ------------------
 // GENERATE
+// ------------------
 function generate(){
 
   order = [];
@@ -211,14 +249,16 @@ function generate(){
       type: rand(types),
       rwy: rwy,
       route: rand(routes),
-      intersection: rand(intersections)
+      intersection: "A1"
     });
   }
 
   render(order);
 }
 
+// ------------------
 // RENDER
+// ------------------
 function render(data){
 
   const list = document.getElementById("list");
@@ -237,9 +277,10 @@ function render(data){
       "<b>" + f.id + "</b><br>" +
       "Type: " + f.type + " | Wake: " + wake(f.type) + "<br>" +
       "RWY: " + f.rwy + " | Route: " + f.route + "<br>" +
-      "INT: " + f.intersection +
-      (valid ? "" : "<br><span style='color:red'>INVALID B restriction</span>");
+      "Intersection: " + f.intersection +
+      (valid ? "" : "<br><span style='color:red'>INVALID (B restriction)</span>");
 
+    // swap logic
     div.onclick = function(){
 
       if(selected === null){
@@ -256,11 +297,30 @@ function render(data){
       }
     };
 
+    // DROPDOWN
+    const select = document.createElement("select");
+
+    intersections.forEach(o=>{
+      let opt = document.createElement("option");
+      opt.value = o;
+      opt.text = o;
+      if(f.intersection === o) opt.selected = true;
+      select.appendChild(opt);
+    });
+
+    select.onchange = function(e){
+      order[index].intersection = e.target.value;
+    };
+
+    div.appendChild(select);
+
     list.appendChild(div);
   });
 }
 
+// ------------------
 // EVALUATE
+// ------------------
 function evaluate(){
 
   if(order.length === 0){
@@ -288,7 +348,9 @@ Difference: +${diff}
 Rating: ${rating}`;
 }
 
+// ------------------
 // CHECK
+// ------------------
 function checkOrder(){
 
   if(order.length === 0){
@@ -298,32 +360,12 @@ function checkOrder(){
 
   let best = greedyBest([...order]);
 
-  const list = document.getElementById("list");
-  list.innerHTML = "";
-
-  order.forEach((f,index)=>{
-
-    const div = document.createElement("div");
-    div.className = "strip";
-
-    let score = index < order.length-1 ? cost(order[index], order[index+1]) : 0;
-    let bestScore = index < best.length-1 ? cost(best[index], best[index+1]) : 0;
-
-    div.style.borderColor = score <= bestScore ? "lime" : "red";
-
-    div.innerHTML =
-      "<b>" + f.id + "</b><br>" +
-      "INT: " + f.intersection + "<br>" +
-      "Delay: " + score + " | Best: " + bestScore;
-
-    list.appendChild(div);
-  });
-
   document.getElementById("result").innerText =
-`CHECK COMPLETE
+`CHECK
 
 Your cost: ${totalCost(order)}
-Best cost: ${totalCost(best)}`;
+Best cost: ${totalCost(best)}
+Difference: ${totalCost(order) - totalCost(best)}`;
 }
 
 </script>
