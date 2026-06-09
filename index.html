@@ -34,10 +34,6 @@ button{
   line-height:1.4;
 }
 
-.strip.active{
-  border-color:yellow;
-}
-
 .result{
   margin-top:20px;
   white-space:pre-line;
@@ -65,12 +61,13 @@ const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
 const types = ["A320","A321","B738","E190","A388","C130","GLEX","C56X","EUROFIGHTER"];
 const runways = ["06","24"];
 const routes = ["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
+const intersections = ["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"];
 
 function rand(arr){
   return arr[Math.floor(Math.random()*arr.length)];
 }
 
-// Wake classification
+// WAKE
 function wake(type){
   if(type==="A388") return "JUMBO";
   if(type==="C130") return "HEAVY";
@@ -78,7 +75,12 @@ function wake(type){
   return "LIGHT";
 }
 
-// Direction rules
+// MILITARY
+function isMilitary(f){
+  return f.type === "EUROFIGHTER" || f.type === "C130";
+}
+
+// DIRECTION RULES
 function direction(f){
 
   if(f.rwy === "24"){
@@ -88,16 +90,38 @@ function direction(f){
 
   if(f.rwy === "06"){
     if(f.route === "NOKAR") return "L";
-    if(f.route === "MARIO") return "S"; // straight
+    if(f.route === "MARIO") return "S";
     return "R";
   }
 
   return "S";
 }
 
-// --------------------
-// COST FUNCTION
-// --------------------
+// INTERSECTION RULES
+function intersectionInfo(f){
+
+  if(f.rwy === "06"){
+    if(["A1","A2"].includes(f.intersection)) return {base:2,type:"STD"};
+    if(["B1","B2","A3","A4"].includes(f.intersection)) return {base:3,type:"INT"};
+  }
+
+  if(f.rwy === "24"){
+    if(["A8","A9","B5"].includes(f.intersection)) return {base:2,type:"STD"};
+    if(["B4","A6"].includes(f.intersection)) return {base:3,type:"INT"};
+  }
+
+  return {base:2,type:"STD"};
+}
+
+// VALIDITY
+function validIntersection(f){
+  if(f.intersection.startsWith("B") && !isMilitary(f)){
+    return false;
+  }
+  return true;
+}
+
+// COST
 function cost(a,b){
 
   let c = 0;
@@ -114,17 +138,28 @@ function cost(a,b){
   if(B==="HEAVY" && A==="JUMBO") c += 2;
   if((B==="LIGHT"||B==="MEDIUM") && A==="JUMBO") c += 3;
 
-  // RUNWAY / DIRECTION RULES
+  // DIRECTION
   if(dirA === dirB && dirA !== "S") c += 2;
-
-  // straight aircraft penalty (MARIO RWY06)
   if(dirA === "S") c += 2;
   if(dirB === "S") c += 2;
+
+  // INTERSECTION COST
+  const Aint = intersectionInfo(a);
+  const Bint = intersectionInfo(b);
+
+  c += Aint.base;
+  c += Bint.base;
+
+  if(Aint.type === "INT") c += 1;
+  if(Bint.type === "INT") c += 1;
+
+  if(!validIntersection(a)) c += 5;
+  if(!validIntersection(b)) c += 5;
 
   return c;
 }
 
-// TOTAL COST
+// TOTAL
 function totalCost(arr){
   let sum = 0;
   for(let i=0;i<arr.length-1;i++){
@@ -133,7 +168,7 @@ function totalCost(arr){
   return sum;
 }
 
-// GREEDY OPTIMIZER
+// GREEDY OPT
 function greedyBest(arr){
 
   let remaining = [...arr];
@@ -162,9 +197,7 @@ function greedyBest(arr){
   return result;
 }
 
-// --------------------
 // GENERATE
-// --------------------
 function generate(){
 
   order = [];
@@ -177,16 +210,15 @@ function generate(){
       id: rand(airlines) + Math.floor(Math.random()*900),
       type: rand(types),
       rwy: rwy,
-      route: rand(routes)
+      route: rand(routes),
+      intersection: rand(intersections)
     });
   }
 
   render(order);
 }
 
-// --------------------
 // RENDER
-// --------------------
 function render(data){
 
   const list = document.getElementById("list");
@@ -197,10 +229,16 @@ function render(data){
     const div = document.createElement("div");
     div.className = "strip";
 
+    let valid = validIntersection(f);
+
+    div.style.borderColor = valid ? "#444" : "red";
+
     div.innerHTML =
       "<b>" + f.id + "</b><br>" +
       "Type: " + f.type + " | Wake: " + wake(f.type) + "<br>" +
-      "RWY: " + f.rwy + " | Route: " + f.route;
+      "RWY: " + f.rwy + " | Route: " + f.route + "<br>" +
+      "INT: " + f.intersection +
+      (valid ? "" : "<br><span style='color:red'>INVALID B restriction</span>");
 
     div.onclick = function(){
 
@@ -222,9 +260,7 @@ function render(data){
   });
 }
 
-// --------------------
 // EVALUATE
-// --------------------
 function evaluate(){
 
   if(order.length === 0){
@@ -252,17 +288,7 @@ Difference: +${diff}
 Rating: ${rating}`;
 }
 
-// --------------------
-// POSITION SCORE
-// --------------------
-function positionScore(arr, index){
-  if(index === arr.length - 1) return 0;
-  return cost(arr[index], arr[index + 1]);
-}
-
-// --------------------
-// CHECK OPTIMAL (VISUAL)
-// --------------------
+// CHECK
 function checkOrder(){
 
   if(order.length === 0){
@@ -275,36 +301,29 @@ function checkOrder(){
   const list = document.getElementById("list");
   list.innerHTML = "";
 
-  order.forEach((f, index)=>{
+  order.forEach((f,index)=>{
 
     const div = document.createElement("div");
     div.className = "strip";
 
-    let userScore = positionScore(order, index);
-    let bestScore = positionScore(best, index);
+    let score = index < order.length-1 ? cost(order[index], order[index+1]) : 0;
+    let bestScore = index < best.length-1 ? cost(best[index], best[index+1]) : 0;
 
-    let ok = userScore <= bestScore;
-
-    div.style.borderColor = ok ? "lime" : "red";
+    div.style.borderColor = score <= bestScore ? "lime" : "red";
 
     div.innerHTML =
       "<b>" + f.id + "</b><br>" +
-      "Type: " + f.type + " | Wake: " + wake(f.type) + "<br>" +
-      "RWY: " + f.rwy + " | Route: " + f.route + "<br>" +
-      "Delay: " + userScore + " | Best: " + bestScore;
+      "INT: " + f.intersection + "<br>" +
+      "Delay: " + score + " | Best: " + bestScore;
 
     list.appendChild(div);
   });
 
-  let userCost = totalCost(order);
-  let bestCost = totalCost(best);
-
   document.getElementById("result").innerText =
-`CHECK RESULT
+`CHECK COMPLETE
 
-Your cost: ${userCost}
-Best cost: ${bestCost}
-Difference: ${userCost - bestCost}`;
+Your cost: ${totalCost(order)}
+Best cost: ${totalCost(best)}`;
 }
 
 </script>
