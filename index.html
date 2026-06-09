@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Real Mode V5</title>
+<title>ATC MAX MODE V6.3</title>
 
 <style>
 body{
@@ -21,7 +21,7 @@ button{
   display:flex;
   flex-direction:column;
   gap:10px;
-  max-width:900px;
+  max-width:850px;
 }
 
 .strip{
@@ -32,6 +32,7 @@ button{
   display:flex;
   flex-direction:column;
   gap:6px;
+  cursor:pointer;
 }
 
 select{
@@ -50,7 +51,7 @@ select{
 
 <body>
 
-<h2>ATC Trainer V5 – REAL MODE</h2>
+<h2>ATC Trainer V6.3 – MAX MODE</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="evaluate()">Evaluate</button>
@@ -68,97 +69,72 @@ let selected=null;
 const airlines=["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
 const types=["A320","A321","B738","E190","A388","C130","GLEX","C56X","EUROFIGHTER"];
 const runways=["06","24"];
-
 const routes=["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
 
-// HARD RULE: ONLY VALID INTERSECTIONS
-const validMap={
-  "06":["A1","A2","A3","A4","B1","B2","A6","B4"],
-  "24":["A8","A9","B5","A6","B4"]
-};
+const intersections=["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"];
 
-// ---------------- RANDOM ----------------
 function rand(a){return a[Math.floor(Math.random()*a.length)];}
 
-// ---------------- CLASS ----------------
+// ---------------- WAKE CLASS ----------------
 function wake(t){
-  if(t==="A388")return "JUMBO";
-  if(t==="C130")return "HEAVY";
-  if(["A320","A321","B738"].includes(t))return "MEDIUM";
+  if(t==="A388") return "JUMBO";
+  if(t==="C130") return "HEAVY";
+  if(["A320","A321","B738"].includes(t)) return "MEDIUM";
   return "LIGHT";
-}
-
-function isMilitary(f){
-  return f.type==="EUROFIGHTER"||f.type==="C130";
 }
 
 // ---------------- DIRECTION ----------------
 function dir(f){
   if(f.rwy==="24"){
-    if(f.route==="NOKAR"||f.route==="MARIO")return "R";
+    if(f.route==="NOKAR"||f.route==="MARIO") return "R";
     return "L";
   }
   if(f.rwy==="06"){
-    if(f.route==="NOKAR")return "L";
-    if(f.route==="MARIO")return "S";
+    if(f.route==="NOKAR") return "L";
+    if(f.route==="MARIO") return "S";
     return "R";
   }
   return "S";
 }
 
-// ---------------- VALIDATION ----------------
+// ---------------- INTERSECTION VALID ----------------
 function valid(f){
-  return validMap[f.rwy].includes(f.intersection)
-  && !(f.intersection.startsWith("B") && !isMilitary(f));
+  return !(f.intersection.startsWith("B") && f.type!=="EUROFIGHTER" && f.type!=="C130");
 }
 
-// ---------------- COST MODEL (REALISTIC) ----------------
+// ---------------- CORE RULE (MAX ONLY) ----------------
 function cost(a,b){
-
-  let c=0;
 
   const A=wake(a.type);
   const B=wake(b.type);
 
-  const dA=dir(a);
-  const dB=dir(b);
+  let wakeCost=0;
 
-  // WAKE (realistic small impact)
-  if(B==="LIGHT"&&A!=="LIGHT")c+=1;
-  if(B==="MEDIUM"&&A==="HEAVY")c+=1;
-  if(B==="HEAVY"&&A==="JUMBO")c+=1;
-  if(B==="LIGHT"&&A==="JUMBO")c+=2;
+  if(B==="LIGHT" && A!=="LIGHT") wakeCost=1;
+  if(B==="MEDIUM" && A==="HEAVY") wakeCost=2;
+  if(B==="LIGHT" && A==="JUMBO") wakeCost=3;
 
-  // DIRECTION SEPARATION
-  if(dA===dB&&dA!=="S")c+=1;
-  if(dA==="S"||dB==="S")c+=1;
+  let routeCost = (a.route===b.route) ? 0 : 2;
 
-  // INTERSECTION (primary driver but controlled)
-  c+=base(a)+base(b);
+  let dirCost = (dir(a)===dir(b) && dir(a)!=="S") ? 1 : 0;
 
-  return c;
+  // 🔥 FINAL RULE: ONLY MAX COUNTS
+  return Math.max(wakeCost, routeCost, dirCost);
 }
 
-// ---------------- INTERSECTION COST ----------------
-function base(f){
-  let i=f.intersection;
-
-  if(["A1","A2","A8","A9","B5"].includes(i))return 1;
-  if(["A3","A4","A6","B1","B2","B4"].includes(i))return 2;
-
-  return 1;
-}
-
-// ---------------- TOTAL ----------------
+// ---------------- TOTAL TIME (SIMULATION STYLE) ----------------
 function total(arr){
-  let s=0;
+
+  let t=0;
+
   for(let i=0;i<arr.length-1;i++){
-    s+=cost(arr[i],arr[i+1]);
+    t += cost(arr[i],arr[i+1]);
   }
-  return s;
+
+  return t;
 }
 
-// ---------------- GREEDY ORDER ----------------
+// ---------------- GREEDY OPT ----------------
 function greedy(arr){
 
   let r=[...arr];
@@ -179,34 +155,33 @@ function greedy(arr){
   return out;
 }
 
-// ---------------- OPTIMAL (VALID ONLY) ----------------
+// ---------------- OPTIMAL (FULL SEARCH small N) ----------------
 function optimal(arr){
 
-  let order=greedy(arr);
+  let best=null;
+  let bestScore=999999;
 
-  return order.map((f,i)=>{
+  function perm(a,cur=[]){
 
-    let best=f.intersection;
-    let bestScore=9999;
-
-    for(let i2=0;i2<validMap[f.rwy].length;i2++){
-
-      let test={...f,intersection:validMap[f.rwy][i2]};
-
-      if(!valid(test))continue;
-
-      let s=0;
-      if(order[i-1])s+=cost(order[i-1],test);
-      if(order[i+1])s+=cost(test,order[i+1]);
-
+    if(a.length===0){
+      let s=total(cur);
       if(s<bestScore){
         bestScore=s;
-        best=test.intersection;
+        best=cur;
       }
+      return;
     }
 
-    return {...f,intersection:best};
-  });
+    for(let i=0;i<a.length;i++){
+      let copy=[...a];
+      let item=copy.splice(i,1)[0];
+      perm(copy,[...cur,item]);
+    }
+  }
+
+  perm(arr);
+
+  return best;
 }
 
 // ---------------- GENERATE ----------------
@@ -223,7 +198,7 @@ function generate(){
       type:rand(types),
       rwy,
       route:rand(routes),
-      intersection:validMap[rwy][0]
+      intersection:rand(intersections)
     });
   }
 
@@ -238,23 +213,20 @@ function render(){
 
   order.forEach((f,i)=>{
 
-    let ok=valid(f);
-
     const div=document.createElement("div");
     div.className="strip";
 
-    div.style.borderColor=ok?"#444":"red";
+    div.style.borderColor=valid(f)?"#444":"red";
 
     div.innerHTML=
       "<b>"+f.id+"</b><br>"+
-      "Type:"+f.type+" | RWY:"+f.rwy+"<br>"+
-      "Route:"+f.route+"<br>"+
-      "INT:"+f.intersection+
-      (ok?"":" <span style='color:red'>(INVALID)</span>");
+      "Type: "+f.type+" | RWY: "+f.rwy+"<br>"+
+      "Route: "+f.route+"<br>"+
+      "INT: "+f.intersection;
 
     const sel=document.createElement("select");
 
-    validMap[f.rwy].forEach(x=>{
+    intersections.forEach(x=>{
       let o=document.createElement("option");
       o.value=x;o.text=x;
       if(x===f.intersection)o.selected=true;
@@ -268,7 +240,7 @@ function render(){
     div.appendChild(sel);
 
     div.onclick=()=>{
-      if(selected===null)selected=i;
+      if(selected===null) selected=i;
       else{
         [order[selected],order[i]]=[order[i],order[selected]];
         selected=null;
@@ -289,9 +261,9 @@ function evaluate(){
   result.innerText=
 `RESULT
 
-Your: ${u.toFixed(2)}
-Optimal: ${o.toFixed(2)}
-Diff: ${(u-o).toFixed(2)}`;
+Your cost: ${u}
+Optimal: ${o}
+Diff: ${u-o}`;
 }
 
 // ---------------- CHECK ----------------
@@ -311,19 +283,20 @@ function check(){
       const div=document.createElement("div");
       div.className="strip";
 
-      let ok=f.intersection===opt[i].intersection;
+      let ok=order[i].id===opt[i].id;
 
       div.style.borderColor=ok?"lime":"orange";
 
       div.innerHTML=
         "<b>"+f.id+"</b><br>"+
-        "USER:"+f.intersection+" | OPT:"+opt[i].intersection;
+        "USER INT: "+f.intersection+"<br>"+
+        "OPT FLOW: "+opt[i].intersection;
 
       list.appendChild(div);
     });
 
     const title=document.createElement("div");
-    title.innerHTML="<h3>OPTIMAL PLAN</h3>";
+    title.innerHTML="<h3>OPTIMAL SEQUENCE</h3>";
     list.appendChild(title);
 
     opt.forEach(f=>{
@@ -333,14 +306,14 @@ function check(){
 
       div.innerHTML=
         "<b>"+f.id+"</b><br>"+
-        "INT:"+f.intersection;
+        "TYPE: "+f.type+" | INT:"+f.intersection;
 
       list.appendChild(div);
     });
 
-    result.innerText+=`\n\nDONE`;
+    result.innerText+="\nDONE";
 
-  },500);
+  },400);
 }
 
 </script>
