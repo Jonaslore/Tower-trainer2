@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Reset</title>
+<title>ATC Simulator V2</title>
 
 <style>
 body{
@@ -17,12 +17,25 @@ button{
   margin:10px 5px;
 }
 
+#list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-width:750px;
+}
+
 .strip{
   background:#1e1e1e;
   border:1px solid #444;
-  padding:10px;
-  margin:5px 0;
+  border-radius:10px;
+  padding:12px;
   cursor:pointer;
+  user-select:none;
+  line-height:1.4;
+}
+
+.strip.active{
+  border-color:yellow;
 }
 
 .result{
@@ -34,7 +47,7 @@ button{
 
 <body>
 
-<h2>ATC RESET VERSION</h2>
+<h2>ATC Simulator V2</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="evaluate()">Evaluate</button>
@@ -47,11 +60,21 @@ button{
 let order = [];
 let selected = null;
 
-const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ"];
+const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
+const types = ["A320","A321","B738","E190","A388","C130","GLEX","C56X","EUROFIGHTER"];
+const runways = ["06","24"];
+const routes = ["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
 
-// random helper
 function rand(arr){
   return arr[Math.floor(Math.random()*arr.length)];
+}
+
+// WAKE CLASS
+function wake(type){
+  if(type==="A388") return "JUMBO";
+  if(type==="C130") return "HEAVY";
+  if(type==="A320"||type==="A321"||type==="B738") return "MEDIUM";
+  return "LIGHT";
 }
 
 // GENERATE
@@ -60,16 +83,21 @@ function generate(){
   order = [];
   selected = null;
 
+  let rwy = rand(runways);
+
   for(let i=0;i<6;i++){
     order.push({
-      id: rand(airlines) + Math.floor(Math.random()*900)
+      id: rand(airlines) + Math.floor(Math.random()*900),
+      type: rand(types),
+      rwy: rwy,
+      route: rand(routes)
     });
   }
 
   render();
 }
 
-// RENDER
+// RENDER STRIPS
 function render(){
 
   const list = document.getElementById("list");
@@ -79,12 +107,17 @@ function render(){
 
     const div = document.createElement("div");
     div.className = "strip";
-    div.innerText = f.id;
+
+    div.innerHTML =
+      "<b>" + f.id + "</b><br>" +
+      "Type: " + f.type + " | Wake: " + wake(f.type) + "<br>" +
+      "RWY: " + f.rwy + " | Route: " + f.route;
 
     div.onclick = function(){
 
       if(selected === null){
         selected = index;
+        div.classList.add("active");
       } else {
 
         let temp = order[selected];
@@ -100,25 +133,92 @@ function render(){
   });
 }
 
-// EVALUATE (100% TESTED SAFE)
+// COST FUNCTION (ATC LIGHT)
+function cost(a,b){
+
+  let c = 0;
+
+  const A = wake(a.type);
+  const B = wake(b.type);
+
+  // Wake turbulence
+  if(B==="LIGHT" && (A==="MEDIUM"||A==="HEAVY"||A==="JUMBO")) c += 2;
+  if(B==="MEDIUM" && A==="HEAVY") c += 2;
+  if(B==="LIGHT" && A==="JUMBO") c += 3;
+
+  // Runway
+  if(a.rwy === b.rwy) c += 1;
+
+  // Route congestion
+  if(a.route === b.route) c += 1;
+
+  return c;
+}
+
+// TOTAL COST
+function totalCost(arr){
+  let sum = 0;
+  for(let i=0;i<arr.length-1;i++){
+    sum += cost(arr[i], arr[i+1]);
+  }
+  return sum;
+}
+
+// SIMPLE OPTIMAL (greedy)
+function greedyBest(arr){
+
+  let remaining = [...arr];
+  let result = [];
+
+  let current = remaining.splice(0,1)[0];
+  result.push(current);
+
+  while(remaining.length > 0){
+
+    let bestIndex = 0;
+    let bestScore = 9999;
+
+    for(let i=0;i<remaining.length;i++){
+      let c = cost(current, remaining[i]);
+      if(c < bestScore){
+        bestScore = c;
+        bestIndex = i;
+      }
+    }
+
+    current = remaining.splice(bestIndex,1)[0];
+    result.push(current);
+  }
+
+  return result;
+}
+
+// EVALUATE
 function evaluate(){
 
-  alert("EVALUATE WORKS");
-
-  const result = document.getElementById("result");
-
   if(order.length === 0){
-    result.innerText = "Press Generate first.";
+    document.getElementById("result").innerText = "Press Generate first.";
     return;
   }
 
-  let text = "RESULT\n\n";
+  let userCost = totalCost(order);
+  let best = greedyBest([...order]);
+  let bestCost = totalCost(best);
 
-  for(let i=0;i<order.length;i++){
-    text += (i+1) + ". " + order[i].id + "\n";
-  }
+  let diff = userCost - bestCost;
 
-  result.innerText = text;
+  let rating = "GOOD";
+  if(diff > 2) rating = "MID";
+  if(diff > 5) rating = "BAD";
+
+  document.getElementById("result").innerText =
+`RESULT
+
+Your cost: ${userCost}
+Best cost: ${bestCost}
+Difference: +${diff}
+
+Rating: ${rating}`;
 }
 
 </script>
