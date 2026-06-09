@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Departure Trainer</title>
+<title>ATC Trainer</title>
 
 <style>
 body{
@@ -15,7 +15,6 @@ body{
 button{
   padding:10px;
   margin:10px 5px;
-  cursor:pointer;
 }
 
 #list{
@@ -30,27 +29,20 @@ button{
   border:1px solid #444;
   border-radius:10px;
   padding:12px;
-
+  cursor:grab;
+  user-select:none;
   display:flex;
   flex-direction:column;
   gap:4px;
-
-  cursor:grab;
-  user-select:none;
 }
 
-.strip:active{
-  cursor:grabbing;
-}
-
-.row{
-  font-size:14px;
+.strip.dragging{
+  opacity:0.5;
 }
 
 .result{
   margin-top:20px;
   white-space:pre-line;
-  color:#ccc;
 }
 </style>
 </head>
@@ -69,13 +61,8 @@ button{
 
 let flights=[];
 
-const types=[
-"A320","B738","A321","E190",
-"A388","EUROFIGHTER","GLEX","C56X",
-"A330","B777","B787"
-];
-
-const airlines=["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
+const types=["A320","B738","A321","E190","A388","EUROFIGHTER","GLEX","C56X"];
+const airlines=["AUA","DLH","RYR","ETH","EZY","WZZ"];
 
 const runways=["06","24"];
 
@@ -98,9 +85,7 @@ function time(){
 }
 
 function generate(){
-
   flights=[];
-
   let rwy=rand(runways);
 
   for(let i=0;i<6;i++){
@@ -122,65 +107,74 @@ function render(){
   const list=document.getElementById("list");
   list.innerHTML="";
 
-  flights.forEach((f,i)=>{
+  flights.forEach((f)=>{
 
     const div=document.createElement("div");
     div.className="strip";
     div.draggable=true;
 
+    div.dataset.id = f.id;
+
     div.innerHTML=`
-<div class="row">${f.type}  ALT:0  Loc:</div>
-<div class="row">${f.id}  HDG:${f.hdg}  Prk:${f.prk}</div>
-<div class="row">${f.time}  GS:0  RWY:${f.rwy}  A9</div>
+<div>${f.type}  ALT:0  Loc:</div>
+<div>${f.id}  HDG:${f.hdg}  Prk:${f.prk}</div>
+<div>${f.time}  GS:0  RWY:${f.rwy}  A9</div>
 `;
 
-    div.addEventListener("dragstart",e=>{
-      dragged=div;
+    // DRAG START
+    div.addEventListener("dragstart",(e)=>{
+      div.classList.add("dragging");
+      e.dataTransfer.setData("text/plain", div.dataset.id);
     });
 
-    div.addEventListener("dragover",e=>{
-      e.preventDefault();
-    });
-
-    div.addEventListener("drop",e=>{
-      e.preventDefault();
-
-      const list=document.getElementById("list");
-
-      if(dragged!==div){
-
-        let nodes=[...list.children];
-        let a=nodes.indexOf(dragged);
-        let b=nodes.indexOf(div);
-
-        if(a<b){
-          list.insertBefore(dragged,div.nextSibling);
-        }else{
-          list.insertBefore(dragged,div);
-        }
-      }
+    div.addEventListener("dragend",()=>{
+      div.classList.remove("dragging");
     });
 
     list.appendChild(div);
   });
+
+  // DROP ZONE LOGIC (FIXED)
+  list.addEventListener("dragover",(e)=>{
+    e.preventDefault();
+
+    const dragging = document.querySelector(".dragging");
+    const afterElement = getDragAfterElement(list, e.clientY);
+
+    if(afterElement == null){
+      list.appendChild(dragging);
+    } else {
+      list.insertBefore(dragging, afterElement);
+    }
+  });
 }
 
-let dragged=null;
+function getDragAfterElement(container, y){
+  const draggableElements = [...container.querySelectorAll(".strip:not(.dragging)")];
+
+  return draggableElements.reduce((closest, child)=>{
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+
+    if(offset < 0 && offset > closest.offset){
+      return { offset: offset, element: child };
+    } else {
+      return closest;
+    }
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
 
 function evaluate(){
 
   const nodes=[...document.querySelectorAll(".strip")];
 
-  let order=nodes.map(n=>n.innerText);
+  let order = nodes.map(n => n.dataset.id);
 
   document.getElementById("result").innerText=
-`CHECK COMPLETE
+`CHECK OK
 
-Flights: ${order.length}
-
-NOTE:
-Logic engine not active yet.
-Next step = real sequencing algorithm (wake + routes + visual + MARIO)
+Order:
+${order.join(" → ")}
 `;
 }
 
