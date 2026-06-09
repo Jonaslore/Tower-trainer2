@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC MAX MODE V7</title>
+<title>ATC Trainer V8 LIVE MODE</title>
 
 <style>
 body{
@@ -21,7 +21,7 @@ button{
   display:flex;
   flex-direction:column;
   gap:10px;
-  max-width:850px;
+  max-width:900px;
 }
 
 .strip{
@@ -42,6 +42,18 @@ select{
   border:1px solid #555;
 }
 
+.bad{
+  border-color:red !important;
+}
+
+.good{
+  border-color:#444 !important;
+}
+
+.best{
+  border-color:lime !important;
+}
+
 .result{
   margin-top:20px;
   white-space:pre-line;
@@ -51,7 +63,7 @@ select{
 
 <body>
 
-<h2>ATC Trainer V7 – MAX MODE</h2>
+<h2>ATC Trainer V8 – LIVE MODE</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="check()">Check Optimal</button>
@@ -65,7 +77,7 @@ let order=[];
 let selected=null;
 
 const airlines=["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
-const types=["A320","A321","B738","E190","A388","C130","GLEX","C56X","EUROFIGHTER"];
+const types=["A320","A321","B738","E190","A388","C130"];
 const runways=["06","24"];
 const routes=["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
 
@@ -76,8 +88,7 @@ function rand(a){return a[Math.floor(Math.random()*a.length)];}
 function wake(t){
   if(t==="A388") return "JUMBO";
   if(t==="C130") return "HEAVY";
-  if(["A320","A321","B738"].includes(t)) return "MEDIUM";
-  return "LIGHT";
+  return "MEDIUM";
 }
 
 function dir(f){
@@ -85,16 +96,7 @@ function dir(f){
     if(f.route==="NOKAR"||f.route==="MARIO") return "R";
     return "L";
   }
-  if(f.rwy==="06"){
-    if(f.route==="NOKAR") return "L";
-    if(f.route==="MARIO") return "S";
-    return "R";
-  }
   return "S";
-}
-
-function valid(f){
-  return !(f.intersection.startsWith("B") && f.type!=="EUROFIGHTER" && f.type!=="C130");
 }
 
 // 🔥 MAX RULE COST
@@ -122,67 +124,34 @@ function total(arr){
   return t;
 }
 
-function optimal(arr){
-
-  let best=null;
-  let bestScore=999999;
-
-  function perm(a,cur=[]){
-    if(a.length===0){
-      let s=total(cur);
-      if(s<bestScore){
-        bestScore=s;
-        best=cur;
-      }
-      return;
-    }
-
-    for(let i=0;i<a.length;i++){
-      let copy=[...a];
-      let item=copy.splice(i,1)[0];
-      perm(copy,[...cur,item]);
-    }
-  }
-
-  perm(arr);
-  return best;
+// ---------------- LIVE SCORE CALC ----------------
+function pairScore(a,b){
+  return cost(a,b);
 }
 
-// ---------------- EXPLANATION ENGINE ----------------
-function explainDiff(user,opt){
+// ---------------- SWAP SUGGESTION ----------------
+function suggestSwap(i){
 
-  let diff = total(user) - total(opt);
+  let best=i;
+  let bestScore=pairScore(order[i],order[i+1]);
 
-  if(diff <= 0){
-    return "Perfekt – keine unnötigen Flow-Konflikte.";
-  }
+  for(let j=0;j<order.length;j++){
+    if(j===i||j===i+1) continue;
 
-  let out=[];
+    let temp=[...order];
+    [temp[i],temp[j]]=[temp[j],temp[i]];
 
-  for(let i=0;i<user.length-1;i++){
+    let s=0;
+    for(let k=0;k<temp.length-1;k++){
+      s+=cost(temp[k],temp[k+1]);
+    }
 
-    let u = cost(user[i],user[i+1]);
-    let o = cost(opt[i],opt[i+1]);
-
-    if(u > o){
-
-      let a=user[i], b=user[i+1];
-
-      let msg = a.id+" → "+b.id+" erzeugt unnötigen Delay.";
-
-      if(a.route === b.route){
-        msg += " Grund: gleiche Route (Flow-Block z.B. EGGIB/RONAL).";
-      } else if(wake(a.type)!==wake(b.type)){
-        msg += " Grund: Wake-Kette ineffizient.";
-      } else {
-        msg += " Grund: Richtung/Flow nicht optimal.";
-      }
-
-      out.push(msg);
+    if(s<total(order)){
+      return "Swap "+order[i].id+" with "+order[j].id;
     }
   }
 
-  return out.join("\n");
+  return "";
 }
 
 // ---------------- GENERATE ----------------
@@ -206,7 +175,7 @@ function generate(){
   render();
 }
 
-// ---------------- RENDER ----------------
+// ---------------- RENDER (LIVE MODE) ----------------
 function render(){
 
   const list=document.getElementById("list");
@@ -217,27 +186,23 @@ function render(){
     const div=document.createElement("div");
     div.className="strip";
 
-    div.style.borderColor=valid(f)?"#444":"red";
+    let score="";
+    if(i<order.length-1){
+      score="Next cost: "+cost(order[i],order[i+1]);
+    }
+
+    let suggestion = suggestSwap(i);
+
+    if(i<order.length-1 && cost(order[i],order[i+1])>=2){
+      div.classList.add("bad");
+    }
 
     div.innerHTML=
       "<b>"+f.id+"</b><br>"+
-      f.type+" | "+f.route+"<br>"+
-      "INT: "+f.intersection;
-
-    const sel=document.createElement("select");
-
-    intersections.forEach(x=>{
-      let o=document.createElement("option");
-      o.value=x;o.text=x;
-      if(x===f.intersection)o.selected=true;
-      sel.appendChild(o);
-    });
-
-    sel.onchange=e=>{
-      order[i].intersection=e.target.value;
-    };
-
-    div.appendChild(sel);
+      "RWY: "+f.rwy+" | "+f.type+"<br>"+
+      "Route: "+f.route+"<br>"+
+      score+
+      (suggestion ? "<br><span style='color:yellow'>"+suggestion+"</span>" : "");
 
     div.onclick=()=>{
       if(selected===null) selected=i;
@@ -252,66 +217,52 @@ function render(){
   });
 }
 
-// ---------------- CHECK ----------------
+// ---------------- CHECK OPTIMAL ----------------
 function check(){
 
-  result.innerText="calculating...";
+  let opt = optimal(order);
 
-  setTimeout(()=>{
+  const list=document.getElementById("list");
+  list.innerHTML="";
 
-    let opt=optimal(order);
+  order.forEach((f,i)=>{
 
-    const list=document.getElementById("list");
-    list.innerHTML="";
+    const div=document.createElement("div");
+    div.className="strip";
 
-    order.forEach((f,i)=>{
+    let ok = order[i].id === opt[i].id;
 
-      const div=document.createElement("div");
-      div.className="strip";
+    div.classList.add(ok ? "best" : "bad");
 
-      let ok = order[i].id === opt[i].id;
+    div.innerHTML=
+      "<b>"+f.id+"</b><br>"+
+      "USER INT: "+f.intersection+"<br>"+
+      "OPT: "+opt[i].intersection;
 
-      div.style.borderColor = ok ? "lime" : "orange";
+    list.appendChild(div);
+  });
 
-      div.innerHTML =
-        "<b>"+f.id+"</b><br>"+
-        "USER INT: "+f.intersection+"<br>"+
-        "OPT INT: "+opt[i].intersection;
+  const title=document.createElement("div");
+  title.innerHTML="<h3>OPTIMAL FLOW</h3>";
+  list.appendChild(title);
 
-      list.appendChild(div);
-    });
+  opt.forEach(f=>{
+    const div=document.createElement("div");
+    div.className="strip best";
 
-    const title=document.createElement("div");
-    title.innerHTML="<h3>OPTIMAL SEQUENCE</h3>";
-    list.appendChild(title);
+    div.innerHTML=
+      "<b>"+f.id+"</b><br>"+
+      f.type+" | "+f.route;
 
-    opt.forEach(f=>{
-      const div=document.createElement("div");
-      div.className="strip";
-      div.style.borderColor="cyan";
+    list.appendChild(div);
+  });
 
-      div.innerHTML =
-        "<b>"+f.id+"</b><br>"+
-        f.type+" | "+f.route+" | "+f.intersection;
-
-      list.appendChild(div);
-    });
-
-    let explanation = explainDiff(order,opt);
-
-    result.innerText =
-`RESULT
-
-Your cost: ${total(order)}
+  result.innerText =
+`TOTAL COST
+User: ${total(order)}
 Optimal: ${total(opt)}
+Diff: ${total(order)-total(opt)}`;
 
-DIFFERENCE: ${total(order)-total(opt)}
-
-WHY:
-
-${explanation}`;
-
-  },400);
 }
 
 </script>
