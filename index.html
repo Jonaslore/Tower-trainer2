@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Trainer Stable</title>
+<title>ATC Trainer Step 1</title>
 
 <style>
 body{
@@ -46,17 +46,18 @@ button{
 
 <body>
 
-<h2>ATC Trainer Stable</h2>
+<h2>ATC Trainer – STEP 1</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="evaluate()">Evaluate</button>
 
 <div id="list"></div>
+
 <div class="result" id="result"></div>
 
 <script>
 
-console.log("SCRIPT LOADED");
+console.log("ATC STEP 1 LOADED");
 
 let order = [];
 let selected = null;
@@ -94,9 +95,9 @@ function render(){
     const div = document.createElement("div");
     div.className = "strip";
 
-    div.innerHTML = `<b>${f.id}</b>`;
+    div.innerHTML = "<b>" + f.id + "</b>";
 
-    div.onclick = ()=>{
+    div.onclick = function(){
 
       if(selected === null){
         selected = index;
@@ -116,15 +117,15 @@ function render(){
   });
 }
 
-// EVALUATE (FORCED GLOBAL SAFE)
+// EVALUATE (100% SAFE FUNCTION BINDING)
 window.evaluate = function(){
 
-  console.log("EVALUATE CLICKED", order);
+  console.log("EVALUATE PRESSED", order);
 
-  const resultBox = document.getElementById("result");
+  const result = document.getElementById("result");
 
   if(!order || order.length === 0){
-    resultBox.innerText = "ERROR: Press Generate first.";
+    result.innerText = "No flights - press Generate";
     return;
   }
 
@@ -134,10 +135,8 @@ window.evaluate = function(){
     text += (i+1) + ". " + order[i].id + "\n";
   }
 
-  text += "\nDONE ✔";
-
-  resultBox.innerText = text;
-}
+  result.innerText = text;
+};
 
 </script>
 
