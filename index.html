@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Trainer V8.1 CLEAN</title>
+<title>ATC Trainer V9 EXAM MODE</title>
 
 <style>
 body{
@@ -32,20 +32,17 @@ button{
   cursor:pointer;
 }
 
-.bad{
-  border-color:red !important;
-}
+.bad{ border-color:red !important; }
+.warn{ border-color:orange !important; }
+.good{ border-color:#444 !important; }
+.best{ border-color:lime !important; }
 
-.warn{
-  border-color:orange !important;
-}
-
-.good{
-  border-color:#444 !important;
-}
-
-.best{
-  border-color:lime !important;
+select{
+  margin-top:6px;
+  padding:4px;
+  background:#222;
+  color:white;
+  border:1px solid #555;
 }
 
 .result{
@@ -57,10 +54,10 @@ button{
 
 <body>
 
-<h2>ATC Trainer V8.1 – CLEAN MODE</h2>
+<h2>ATC Trainer V9 – EXAM MODE</h2>
 
 <button onclick="generate()">Generate</button>
-<button onclick="check()">Check Optimal</button>
+<button onclick="check()">Check Exam</button>
 
 <div id="list"></div>
 <div class="result" id="result"></div>
@@ -79,12 +76,14 @@ const intersections=["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"];
 
 function rand(a){return a[Math.floor(Math.random()*a.length)];}
 
+// ---------------- WAKE ----------------
 function wake(t){
   if(t==="A388") return "JUMBO";
   if(t==="C130") return "HEAVY";
   return "MEDIUM";
 }
 
+// ---------------- DIRECTION ----------------
 function dir(f){
   if(f.rwy==="24"){
     if(f.route==="NOKAR"||f.route==="MARIO") return "R";
@@ -93,7 +92,7 @@ function dir(f){
   return "S";
 }
 
-// 🔥 MAX RULE
+// ---------------- MAX RULE COST ----------------
 function cost(a,b){
 
   const A=wake(a.type);
@@ -110,6 +109,7 @@ function cost(a,b){
   return Math.max(wakeCost, routeCost, dirCost);
 }
 
+// ---------------- TOTAL COST ----------------
 function total(arr){
   let t=0;
   for(let i=0;i<arr.length-1;i++){
@@ -167,6 +167,23 @@ function render(){
       "RWY: "+f.rwy+" | "+f.type+"<br>"+
       "Route: "+f.route;
 
+    // 🔥 INTERSECTION SELECTOR
+    const sel=document.createElement("select");
+
+    intersections.forEach(x=>{
+      let o=document.createElement("option");
+      o.value=x;
+      o.text=x;
+      if(x===f.intersection)o.selected=true;
+      sel.appendChild(o);
+    });
+
+    sel.onchange=e=>{
+      order[i].intersection=e.target.value;
+    };
+
+    div.appendChild(sel);
+
     div.onclick=()=>{
       if(selected===null) selected=i;
       else{
@@ -180,20 +197,57 @@ function render(){
   });
 }
 
-// ---------------- CHECK ----------------
+// ---------------- CHECK (EXAM MODE) ----------------
 function check(){
 
   let opt = optimal(order);
+
+  const list=document.getElementById("list");
+  list.innerHTML="";
+
+  order.forEach((f,i)=>{
+
+    const div=document.createElement("div");
+    div.className="strip";
+
+    let ok = order[i].id === opt[i].id;
+
+    div.classList.add(ok ? "best" : "bad");
+
+    div.innerHTML=
+      "<b>"+f.id+"</b><br>"+
+      "USER INT: "+f.intersection+"<br>"+
+      "OPT INT: "+opt[i].intersection+"<br>"+
+      "TYPE: "+f.type+" | RWY: "+f.rwy;
+
+    list.appendChild(div);
+  });
+
+  const title=document.createElement("div");
+  title.innerHTML="<h3>OPTIMAL SEQUENCE</h3>";
+  list.appendChild(title);
+
+  opt.forEach(f=>{
+    const div=document.createElement("div");
+    div.className="strip best";
+
+    div.innerHTML=
+      "<b>"+f.id+"</b><br>"+
+      f.type+" | "+f.route+" | "+f.intersection;
+
+    list.appendChild(div);
+  });
 
   result.innerText =
 `RESULT
 
 Your cost: ${total(order)}
 Optimal: ${total(opt)}
-Diff: ${total(order)-total(opt)}`;
+Difference: ${total(order)-total(opt)}`;
 
 }
 
+// ---------------- OPTIMAL SOLVER ----------------
 function optimal(arr){
 
   let best=null;
