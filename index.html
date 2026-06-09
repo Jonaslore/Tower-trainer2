@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Trainer</title>
+<title>ATC Simulator ALL-IN</title>
 
 <style>
 body{
@@ -21,7 +21,7 @@ button{
   display:flex;
   flex-direction:column;
   gap:10px;
-  max-width:700px;
+  max-width:750px;
 }
 
 .strip{
@@ -29,17 +29,13 @@ button{
   border:1px solid #444;
   border-radius:10px;
   padding:12px;
-  user-select:none;
   cursor:pointer;
+  user-select:none;
 }
 
 .strip.active{
   border-color:#f1c40f;
 }
-
-.good{ border-color:#2ecc71; }
-.mid{ border-color:#f1c40f; }
-.bad{ border-color:#e74c3c; }
 
 .result{
   margin-top:20px;
@@ -50,12 +46,13 @@ button{
 
 <body>
 
-<h2>ATC Trainer – Wake & Runway</h2>
+<h2>ATC Simulator ALL-IN</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="evaluate()">Evaluate</button>
 
 <div id="list"></div>
+
 <div class="result" id="result"></div>
 
 <script>
@@ -64,15 +61,20 @@ let flights = [];
 let order = [];
 let selected = null;
 
-const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ"];
-const types = ["A320","B738","A321","E190","A388","C130","GLEX","C56X"];
+const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
+
+const types = ["A320","A321","B738","E190","A388","C130","GLEX","C56X","EUROFIGHTER"];
+
 const runways = ["06","24"];
 
+const routes = ["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
+
+// RANDOM
 function rand(a){
   return a[Math.floor(Math.random()*a.length)];
 }
 
-// WAKE CLASS
+// WAKE
 function wake(type){
   if(type==="A388") return "JUMBO";
   if(type==="C130") return "HEAVY";
@@ -80,37 +82,12 @@ function wake(type){
   return "LIGHT";
 }
 
-// COST
-function cost(a,b){
-
-  let c = 0;
-
-  const A = wake(a.type);
-  const B = wake(b.type);
-
-  if(B==="LIGHT" && (A==="MEDIUM"||A==="HEAVY"||A==="JUMBO")) c += 2;
-  if(B==="MEDIUM" && A==="HEAVY") c += 2;
-  if(B==="LIGHT" && A==="JUMBO") c += 3;
-
-  if(a.rwy === b.rwy) c += 1;
-
-  return c;
-}
-
-// TOTAL COST
-function totalCost(arr){
-  let sum = 0;
-  for(let i=0;i<arr.length-1;i++){
-    sum += cost(arr[i], arr[i+1]);
-  }
-  return sum;
-}
-
 // GENERATE
 function generate(){
 
   flights = [];
   order = [];
+  selected = null;
 
   let rwy = rand(runways);
 
@@ -118,7 +95,8 @@ function generate(){
     flights.push({
       id: rand(airlines)+Math.floor(Math.random()*900),
       type: rand(types),
-      rwy: rwy
+      rwy: rwy,
+      route: rand(routes)
     });
   }
 
@@ -132,17 +110,17 @@ function render(){
   const list = document.getElementById("list");
   list.innerHTML = "";
 
-  order.forEach((f, index)=>{
+  order.forEach((f,index)=>{
 
     const div = document.createElement("div");
     div.className = "strip";
 
     div.innerHTML = `
 <b>${f.id}</b> – ${f.type}<br>
-RWY: ${f.rwy} | WAKE: ${wake(f.type)}
+RWY: ${f.rwy} | WAKE: ${wake(f.type)} | ROUTE: ${f.route}
 `;
 
-    div.onclick = () => {
+    div.onclick = ()=>{
 
       if(selected === null){
         selected = index;
@@ -162,47 +140,94 @@ RWY: ${f.rwy} | WAKE: ${wake(f.type)}
   });
 }
 
-// EVALUATE (FIXED)
+// COST MODEL
+function cost(a,b){
+
+  let c = 0;
+
+  const A = wake(a.type);
+  const B = wake(b.type);
+
+  // WAKE
+  if(B==="LIGHT" && (A==="MEDIUM"||A==="HEAVY"||A==="JUMBO")) c += 2;
+  if(B==="MEDIUM" && A==="HEAVY") c += 2;
+  if(B==="LIGHT" && A==="JUMBO") c += 3;
+
+  // RUNWAY
+  if(a.rwy === b.rwy) c += 1;
+
+  // ROUTE
+  if(a.route === b.route) c += 1;
+
+  return c;
+}
+
+// TOTAL
+function totalCost(arr){
+  let sum = 0;
+  for(let i=0;i<arr.length-1;i++){
+    sum += cost(arr[i], arr[i+1]);
+  }
+  return sum;
+}
+
+// GREEDY BEST
+function greedyBest(arr){
+
+  let remaining = [...arr];
+  let result = [];
+
+  let current = remaining.splice(0,1)[0];
+  result.push(current);
+
+  while(remaining.length > 0){
+
+    let bestIndex = 0;
+    let bestScore = 9999;
+
+    for(let i=0;i<remaining.length;i++){
+      let c = cost(current, remaining[i]);
+      if(c < bestScore){
+        bestScore = c;
+        bestIndex = i;
+      }
+    }
+
+    current = remaining.splice(bestIndex,1)[0];
+    result.push(current);
+  }
+
+  return result;
+}
+
+// EVALUATE
 function evaluate(){
 
-  console.log("EVALUATE CLICKED");
-
-  if(!order || order.length === 0){
-    document.getElementById("result").innerText =
-      "ERROR: No flight data loaded. Press Generate first.";
+  if(order.length === 0){
+    document.getElementById("result").innerText = "Press Generate first.";
     return;
   }
 
-  let userCost = 0;
-
-  for(let i=0;i<order.length-1;i++){
-    userCost += cost(order[i], order[i+1]);
-  }
-
-  // simple fallback (no optimizer crash risk)
-  let bestCost = userCost - 1;
-  if(bestCost < 0) bestCost = 0;
+  let userCost = totalCost(order);
+  let best = greedyBest(order);
+  let bestCost = totalCost(best);
 
   let diff = userCost - bestCost;
 
-  let color = "good";
-  if(diff > 2) color = "mid";
-  if(diff > 5) color = "bad";
-
-  document.querySelectorAll(".strip").forEach(el=>{
-    el.classList.remove("good","mid","bad");
-    el.classList.add(color);
-  });
+  let rating = "GOOD";
+  if(diff > 2) rating = "MID";
+  if(diff > 5) rating = "BAD";
 
   document.getElementById("result").innerText =
 `RESULT
 
-Your score: ${userCost}
-Best possible: ${bestCost}
+Your cost: ${userCost}
+Best cost: ${bestCost}
 Difference: +${diff}
 
-(${color.toUpperCase()})`;
+Rating: ${rating}`;
 }
+
 </script>
 
 </body>
