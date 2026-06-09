@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Workshop</title>
+<title>ATC Trainer Stable</title>
 
 <style>
 body{
@@ -46,7 +46,7 @@ button{
 
 <body>
 
-<h2>ATC Workshop</h2>
+<h2>ATC Trainer Stable</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="evaluate()">Evaluate</button>
@@ -56,11 +56,14 @@ button{
 
 <script>
 
+console.log("SCRIPT LOADED");
+
 let order = [];
 let selected = null;
 
 const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ"];
 
+// RANDOM
 function rand(arr){
   return arr[Math.floor(Math.random()*arr.length)];
 }
@@ -113,21 +116,21 @@ function render(){
   });
 }
 
-// EVALUATE (100% SAFE)
-function evaluate(){
+// EVALUATE (FORCED GLOBAL SAFE)
+window.evaluate = function(){
 
-  console.log("EVALUATE PRESSED", order);
+  console.log("EVALUATE CLICKED", order);
 
   const resultBox = document.getElementById("result");
 
   if(!order || order.length === 0){
-    resultBox.innerText = "ERROR: No data. Press Generate.";
+    resultBox.innerText = "ERROR: Press Generate first.";
     return;
   }
 
   let text = "RESULT\n\n";
 
-  for(let i = 0; i < order.length; i++){
+  for(let i=0;i<order.length;i++){
     text += (i+1) + ". " + order[i].id + "\n";
   }
 
@@ -135,6 +138,7 @@ function evaluate(){
 
   resultBox.innerText = text;
 }
+
 </script>
 
 </body>
