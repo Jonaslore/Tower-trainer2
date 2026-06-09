@@ -62,13 +62,15 @@ button{
 
 let flights = [];
 let order = [];
+let selected = null;
 
 const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ"];
 const types = ["A320","B738","A321","E190","A388","C130","GLEX","C56X"];
-
 const runways = ["06","24"];
 
-let selected = null;
+function rand(a){
+  return a[Math.floor(Math.random()*a.length)];
+}
 
 // WAKE CLASS
 function wake(type){
@@ -78,7 +80,7 @@ function wake(type){
   return "LIGHT";
 }
 
-// COST FUNCTION (ATC simplified)
+// COST
 function cost(a,b){
 
   let c = 0;
@@ -86,21 +88,25 @@ function cost(a,b){
   const A = wake(a.type);
   const B = wake(b.type);
 
-  // Wake rules
   if(B==="LIGHT" && (A==="MEDIUM"||A==="HEAVY"||A==="JUMBO")) c += 2;
   if(B==="MEDIUM" && A==="HEAVY") c += 2;
   if(B==="LIGHT" && A==="JUMBO") c += 3;
 
-  // runway pressure (same runway = more restriction)
   if(a.rwy === b.rwy) c += 1;
 
   return c;
 }
 
-function rand(a){
-  return a[Math.floor(Math.random()*a.length)];
+// TOTAL COST
+function totalCost(arr){
+  let sum = 0;
+  for(let i=0;i<arr.length-1;i++){
+    sum += cost(arr[i], arr[i+1]);
+  }
+  return sum;
 }
 
+// GENERATE
 function generate(){
 
   flights = [];
@@ -120,6 +126,7 @@ function generate(){
   render();
 }
 
+// RENDER
 function render(){
 
   const list = document.getElementById("list");
@@ -155,32 +162,37 @@ RWY: ${f.rwy} | WAKE: ${wake(f.type)}
   });
 }
 
-// OPTIMAL CALC
-function totalCost(arr){
-  let sum = 0;
-  for(let i=0;i<arr.length-1;i++){
-    sum += cost(arr[i], arr[i+1]);
-  }
-  return sum;
-}
-
+// EVALUATE (FIXED)
 function evaluate(){
 
   let userCost = totalCost(order);
 
-  // brute optimal (small dataset)
-  let perms = permute(order);
+  let bestCost = 999999;
+  let best = [];
 
-  let best = perms[0];
-  let bestCost = totalCost(best);
+  let remaining = [...order];
 
-  for(let p of perms){
-    let c = totalCost(p);
-    if(c < bestCost){
-      bestCost = c;
-      best = p;
+  let current = remaining.splice(0,1)[0];
+  best.push(current);
+
+  while(remaining.length > 0){
+
+    let bestIndex = 0;
+    let bestLocal = 999999;
+
+    for(let i=0;i<remaining.length;i++){
+      let c = cost(current, remaining[i]);
+      if(c < bestLocal){
+        bestLocal = c;
+        bestIndex = i;
+      }
     }
+
+    current = remaining.splice(bestIndex,1)[0];
+    best.push(current);
   }
+
+  bestCost = totalCost(best);
 
   let diff = userCost - bestCost;
 
@@ -188,9 +200,7 @@ function evaluate(){
   if(diff > 2) color = "mid";
   if(diff > 5) color = "bad";
 
-  const list = document.querySelectorAll(".strip");
-
-  list.forEach(el=>{
+  document.querySelectorAll(".strip").forEach(el=>{
     el.classList.remove("good","mid","bad");
     el.classList.add(color);
   });
@@ -198,25 +208,11 @@ function evaluate(){
   document.getElementById("result").innerText =
 `RESULT
 
-Your delay score: ${userCost}
+Your score: ${userCost}
 Best possible: ${bestCost}
 Difference: +${diff}
 
 (${color.toUpperCase()})`;
-}
-
-// small permutation generator (6 items only)
-function permute(arr){
-  if(arr.length <=1) return [arr];
-  let res = [];
-
-  for(let i=0;i<arr.length;i++){
-    let rest = arr.slice(0,i).concat(arr.slice(i+1));
-    for(let p of permute(rest)){
-      res.push([arr[i],...p]);
-    }
-  }
-  return res;
 }
 
 </script>
