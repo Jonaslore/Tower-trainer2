@@ -116,20 +116,25 @@ function render(){
 // EVALUATE (100% SAFE)
 function evaluate(){
 
-  if(order.length === 0){
-    document.getElementById("result").innerText = "Press Generate first.";
+  console.log("EVALUATE PRESSED", order);
+
+  const resultBox = document.getElementById("result");
+
+  if(!order || order.length === 0){
+    resultBox.innerText = "ERROR: No data. Press Generate.";
     return;
   }
 
   let text = "RESULT\n\n";
 
-  for(let i=0;i<order.length;i++){
+  for(let i = 0; i < order.length; i++){
     text += (i+1) + ". " + order[i].id + "\n";
   }
 
-  document.getElementById("result").innerText = text;
-}
+  text += "\nDONE ✔";
 
+  resultBox.innerText = text;
+}
 </script>
 
 </body>
