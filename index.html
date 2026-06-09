@@ -1,5 +1,4 @@
-<h1>FORCE UPDATE 123456</h1>
-<h1 style="color:red">TEST-VERSION 999</h1>
+<h1 style="color:red;">ATC TRAINER – VERSION 998</h1>
 <!DOCTYPE html>
 <html>
 <head>
@@ -31,15 +30,17 @@ button{
   border:1px solid #444;
   border-radius:10px;
   padding:12px;
-  cursor:grab;
-  user-select:none;
+
   display:flex;
   flex-direction:column;
   gap:4px;
+
+  user-select:none;
+  touch-action:none;
 }
 
 .strip.dragging{
-  opacity:0.5;
+  opacity:0.4;
 }
 
 .result{
@@ -61,19 +62,26 @@ button{
 
 <script>
 
-let flights=[];
+let flights = [];
 
-const types=["A320","B738","A321","E190","A388","EUROFIGHTER","GLEX","C56X"];
-const airlines=["AUA","DLH","RYR","ETH","EZY","WZZ"];
+const types = [
+"A320","B738","A321","E190",
+"A388","EUROFIGHTER","GLEX","C56X",
+"A330","B777","B787"
+];
 
-const runways=["06","24"];
+const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
+
+const runways = ["06","24"];
+
+let dragged = null;
 
 function rand(a){
   return a[Math.floor(Math.random()*a.length)];
 }
 
 function prk(){
-  return "M"+(10+Math.floor(Math.random()*90));
+  return "M" + (10 + Math.floor(Math.random()*90));
 }
 
 function hdg(){
@@ -81,23 +89,25 @@ function hdg(){
 }
 
 function time(){
-  let h=10+Math.floor(Math.random()*10);
-  let m=Math.floor(Math.random()*60);
-  return ""+h+(m<10?"0"+m:m);
+  let h = 10 + Math.floor(Math.random()*10);
+  let m = Math.floor(Math.random()*60);
+  return "" + h + (m < 10 ? "0"+m : m);
 }
 
 function generate(){
-  flights=[];
-  let rwy=rand(runways);
+
+  flights = [];
+
+  let rwy = rand(runways);
 
   for(let i=0;i<6;i++){
     flights.push({
-      id: rand(airlines)+Math.floor(Math.random()*900),
+      id: rand(airlines) + Math.floor(Math.random()*900),
       type: rand(types),
-      rwy:rwy,
-      prk:prk(),
-      hdg:hdg(),
-      time:time()
+      rwy: rwy,
+      prk: prk(),
+      hdg: hdg(),
+      time: time()
     });
   }
 
@@ -106,78 +116,70 @@ function generate(){
 
 function render(){
 
-  const list=document.getElementById("list");
-  list.innerHTML="";
+  const list = document.getElementById("list");
+  list.innerHTML = "";
 
-  flights.forEach((f)=>{
+  flights.forEach(f => {
 
-    const div=document.createElement("div");
-    div.className="strip";
-    div.draggable=true;
-
+    const div = document.createElement("div");
+    div.className = "strip";
+    div.draggable = true;
     div.dataset.id = f.id;
 
-    div.innerHTML=`
-<div>${f.type}  ALT:0  Loc:</div>
-<div>${f.id}  HDG:${f.hdg}  Prk:${f.prk}</div>
-<div>${f.time}  GS:0  RWY:${f.rwy}  A9</div>
+    div.innerHTML = `
+${f.type}  ALT:0  Loc:
+${f.id}  HDG:${f.hdg}  Prk:${f.prk}
+${f.time}  GS:0  RWY:${f.rwy}  A9
 `;
 
-    // DRAG START
-    div.addEventListener("dragstart",(e)=>{
+    div.addEventListener("dragstart", e => {
+      dragged = div;
       div.classList.add("dragging");
-      e.dataTransfer.setData("text/plain", div.dataset.id);
+      e.dataTransfer.effectAllowed = "move";
     });
 
-    div.addEventListener("dragend",()=>{
+    div.addEventListener("dragend", () => {
       div.classList.remove("dragging");
+      dragged = null;
+    });
+
+    div.addEventListener("dragover", e => {
+      e.preventDefault();
+    });
+
+    div.addEventListener("drop", e => {
+      e.preventDefault();
+
+      if(dragged && dragged !== div){
+        const list = document.getElementById("list");
+
+        const nodes = [...list.children];
+        const a = nodes.indexOf(dragged);
+        const b = nodes.indexOf(div);
+
+        if(a < b){
+          list.insertBefore(dragged, div.nextSibling);
+        } else {
+          list.insertBefore(dragged, div);
+        }
+      }
     });
 
     list.appendChild(div);
   });
-
-  // DROP ZONE LOGIC (FIXED)
-  list.addEventListener("dragover",(e)=>{
-    e.preventDefault();
-
-    const dragging = document.querySelector(".dragging");
-    const afterElement = getDragAfterElement(list, e.clientY);
-
-    if(afterElement == null){
-      list.appendChild(dragging);
-    } else {
-      list.insertBefore(dragging, afterElement);
-    }
-  });
-}
-
-function getDragAfterElement(container, y){
-  const draggableElements = [...container.querySelectorAll(".strip:not(.dragging)")];
-
-  return draggableElements.reduce((closest, child)=>{
-    const box = child.getBoundingClientRect();
-    const offset = y - box.top - box.height / 2;
-
-    if(offset < 0 && offset > closest.offset){
-      return { offset: offset, element: child };
-    } else {
-      return closest;
-    }
-  }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
 function evaluate(){
 
-  const nodes=[...document.querySelectorAll(".strip")];
+  const nodes = [...document.querySelectorAll(".strip")];
 
-  let order = nodes.map(n => n.dataset.id);
+  const order = nodes.map(n => n.dataset.id);
 
-  document.getElementById("result").innerText=
-`CHECK OK
+  document.getElementById("result").innerText =
+`CHECK COMPLETE
 
 Order:
-${order.join(" → ")}
-`;
+${order.join(" → ")}`;
 }
 
 </script>
