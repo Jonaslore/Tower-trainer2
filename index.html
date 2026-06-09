@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Simulator</title>
+<title>ATC Trainer</title>
 
 <style>
 body{
@@ -21,35 +21,37 @@ button{
   display:flex;
   flex-direction:column;
   gap:10px;
-  max-width:750px;
+  max-width:700px;
 }
 
 .strip{
   background:#1e1e1e;
   border:1px solid #444;
   border-radius:10px;
-  padding:10px;
-  cursor:grab;
-  user-select:none;
+  padding:12px;
+
   display:flex;
   flex-direction:column;
-  gap:3px;
+
+  cursor:grab;
+  user-select:none;
 }
 
-.good{ border-color: #2ecc71; }
-.mid{ border-color: #f1c40f; }
-.bad{ border-color: #e74c3c; }
+.strip.dragging{
+  opacity:0.4;
+}
 
 .result{
   margin-top:20px;
   white-space:pre-line;
+  color:#ccc;
 }
 </style>
 </head>
 
 <body>
 
-<h2>ATC Departure Simulator</h2>
+<h2>ATC Trainer</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="evaluate()">Evaluate</button>
@@ -60,91 +62,29 @@ button{
 <script>
 
 let flights = [];
-let userOrder = [];
-
-const types = ["A320","B738","A321","E190","A388","C130","GLEX","C56X","EUROFIGHTER"];
+let order = [];
 
 const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ"];
 
-const runways = ["06","24"];
+const types = ["A320","B738","A321","E190","A388","C130","GLEX","C56X","EUROFIGHTER"];
 
-function rand(a){ return a[Math.floor(Math.random()*a.length)]; }
-
-function prk(){ return "M"+(10+Math.floor(Math.random()*90)); }
-
-function hdg(){ return Math.floor(Math.random()*360); }
-
-// TYPE CLASS
-function classOf(t){
-  if(t==="A388") return "JUMBO";
-  if(t==="B738"||t==="A321"||t==="A320") return "MEDIUM";
-  if(t==="E190"||t==="C56X"||t==="GLEX") return "LIGHT";
-  if(t==="EUROFIGHTER") return "LIGHT";
-  if(t==="C130") return "HEAVY";
-  return "MEDIUM";
-}
-
-// SIMPLE COST MODEL
-function cost(a,b){
-
-  let c = 0;
-
-  // wake
-  const A = classOf(a.type);
-  const B = classOf(b.type);
-
-  if(B==="LIGHT" && (A==="MEDIUM"||A==="HEAVY"||A==="JUMBO")) c += 2;
-  if(B==="MEDIUM" && A==="HEAVY") c += 2;
-  if(B==="LIGHT" && A==="JUMBO") c += 3;
-
-  // runway same
-  if(a.rwy === b.rwy) c += 1;
-
-  return c;
-}
-
-// greedy optimal ordering
-function optimize(list){
-  let remaining = [...list];
-  let result = [];
-
-  result.push(remaining.splice(0,1)[0]);
-
-  while(remaining.length){
-    let bestIndex = 0;
-    let bestScore = 9999;
-
-    for(let i=0;i<remaining.length;i++){
-      let score = cost(result[result.length-1], remaining[i]);
-      if(score < bestScore){
-        bestScore = score;
-        bestIndex = i;
-      }
-    }
-
-    result.push(remaining.splice(bestIndex,1)[0]);
-  }
-
-  return result;
+function rand(a){
+  return a[Math.floor(Math.random()*a.length)];
 }
 
 function generate(){
 
   flights = [];
-  userOrder = [];
-
-  let rwy = rand(runways);
+  order = [];
 
   for(let i=0;i<6;i++){
     flights.push({
       id: rand(airlines)+Math.floor(Math.random()*900),
-      type: rand(types),
-      rwy:rwy,
-      prk:prk()
+      type: rand(types)
     });
   }
 
-  userOrder = [...flights];
+  order = [...flights];
 
   render();
 }
@@ -154,17 +94,17 @@ function render(){
   const list = document.getElementById("list");
   list.innerHTML = "";
 
-  userOrder.forEach((f,i)=>{
+  order.forEach((f)=>{
 
     const div = document.createElement("div");
     div.className = "strip";
     div.draggable = true;
+
     div.dataset.id = f.id;
 
     div.innerHTML = `
+<b>${f.id}</b>
 ${f.type}
-${f.id}
-RWY:${f.rwy} PRK:${f.prk}
 `;
 
     div.addEventListener("dragstart", ()=>{
@@ -190,7 +130,7 @@ RWY:${f.rwy} PRK:${f.prk}
       const from = nodes.indexOf(dragged);
       const to = nodes.indexOf(div);
 
-      userOrder.splice(to,0,userOrder.splice(from,1)[0]);
+      order.splice(to,0,order.splice(from,1)[0]);
 
       render();
     });
@@ -201,37 +141,13 @@ RWY:${f.rwy} PRK:${f.prk}
 
 function evaluate(){
 
-  const optimal = optimize([...flights]);
-
-  const userIds = userOrder.map(f=>f.id);
-  const optIds = optimal.map(f=>f.id);
-
-  let score = 0;
-
-  userOrder.forEach((f,i)=>{
-    if(f.id === optIds[i]) score++;
-  });
-
-  const list = document.querySelectorAll(".strip");
-
-  list.forEach((el,i)=>{
-    if(userOrder[i].id === optIds[i]){
-      el.classList.add("good");
-    } else {
-      el.classList.add("bad");
-    }
-  });
+  const ids = order.map(f => f.id);
 
   document.getElementById("result").innerText =
 `RESULT
 
-Your score: ${score}/6
-
-Optimal order:
-${optIds.join(" → ")}
-
-Your order:
-${userIds.join(" → ")}`;
+Order:
+${ids.join(" → ")}`;
 }
 
 </script>
