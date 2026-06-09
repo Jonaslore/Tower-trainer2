@@ -201,15 +201,20 @@ function greedyBest(arr){
 }
 
 // EVALUATE
+// EVALUATE
 function evaluate(){
 
-  if(order.length === 0){
-    document.getElementById("result").innerText = "Press Generate first.";
+  console.log("EVALUATE CLICKED", order);
+
+  if(!order || order.length === 0){
+    document.getElementById("result").innerText =
+      "ERROR: No flights found. Please press Generate.";
     return;
   }
 
   let userCost = totalCost(order);
-  let best = greedyBest(order);
+
+  let best = greedyBest([...order]);
   let bestCost = totalCost(best);
 
   let diff = userCost - bestCost;
@@ -221,14 +226,14 @@ function evaluate(){
   document.getElementById("result").innerText =
 `RESULT
 
+Flights: ${order.length}
+
 Your cost: ${userCost}
 Best cost: ${bestCost}
 Difference: +${diff}
 
 Rating: ${rating}`;
 }
-
 </script>
-
 </body>
 </html>
