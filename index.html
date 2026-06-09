@@ -2,197 +2,171 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Departure Trainer</title>
+<title>ATC Trainer</title>
 
 <style>
-body {
-    font-family: Arial;
-    background: #111;
-    color: white;
-    margin: 0;
-    padding: 20px;
+body{
+  font-family: Arial;
+  background:#111;
+  color:white;
+  padding:20px;
 }
 
-button {
-    padding: 10px;
-    margin: 10px 5px;
-    cursor: pointer;
+button{
+  padding:10px;
+  margin:10px 5px;
 }
 
-#list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    max-width: 600px;
+#list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-width:700px;
 }
 
-.strip {
-    background: #1e1e1e;
-    border: 1px solid #444;
-    padding: 10px;
-    border-radius: 10px;
-    cursor: grab;
+.strip{
+  background:#1e1e1e;
+  border:1px solid #444;
+  border-radius:10px;
+  padding:10px;
+
+  display:flex;
+  flex-direction:column;   /* <<< FIX: alles untereinander */
+  gap:4px;
+
+  cursor:grab;
 }
 
-.strip:active {
-    cursor: grabbing;
+.strip:active{
+  cursor:grabbing;
 }
 
-.good {
-    border-color: #2ecc71;
+.row{
+  display:block;
 }
 
-.bad {
-    border-color: #e74c3c;
-}
-
-.result {
-    margin-top: 20px;
-    white-space: pre-line;
+.result{
+  margin-top:20px;
+  white-space:pre-line;
 }
 </style>
 </head>
 
 <body>
 
-<h2>ATC Departure Sequencing Trainer</h2>
+<h2>ATC Departure Trainer</h2>
 
-<button onclick="generate()">Generate Scenario</button>
+<button onclick="generate()">Generate</button>
 <button onclick="evaluate()">Evaluate</button>
 
 <div id="list"></div>
-
 <div class="result" id="result"></div>
 
 <script>
 
 let flights = [];
 
-const types = [
-"A320","B738","A321","E190",
-"A388","EUROFIGHTER","GLEX","C56X",
-"A330","B777","B787"
-];
+const types=["A320","B738","A321","E190","A388","EUROFIGHTER","GLEX","C56X"];
+const airlines=["AUA","DLH","RYR","ETH","EZY","WZZ"];
 
-const airlines = ["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
+const runways=["06","24"];
 
-const runways = ["06","24"];
+function rand(a){return a[Math.floor(Math.random()*a.length)];}
 
-function rand(arr){
-    return arr[Math.floor(Math.random()*arr.length)];
-}
+function prk(){return "M"+(10+Math.floor(Math.random()*90));}
 
-function randTime(){
-    let h = 10 + Math.floor(Math.random()*10);
-    let m = Math.floor(Math.random()*60);
-    return "" + h + (m<10?"0"+m:m);
-}
+function hdg(){return Math.floor(Math.random()*360);}
 
-function prk(){
-    return "M" + (10 + Math.floor(Math.random()*90));
-}
-
-function hdg(){
-    return Math.floor(Math.random()*360);
+function time(){
+  let h=10+Math.floor(Math.random()*10);
+  let m=Math.floor(Math.random()*60);
+  return ""+h+(m<10?"0"+m:m);
 }
 
 function generate(){
 
-    flights = [];
+  flights=[];
 
-    let rwy = rand(runways);
+  let rwy=rand(runways);
 
-    for(let i=0;i<6;i++){
-        flights.push({
-            id: rand(airlines) + Math.floor(Math.random()*900),
-            type: rand(types),
-            rwy: rwy,
-            prk: prk(),
-            hdg: hdg(),
-            time: randTime()
-        });
-    }
+  for(let i=0;i<6;i++){
+    flights.push({
+      id: rand(airlines)+Math.floor(Math.random()*900),
+      type: rand(types),
+      rwy:rwy,
+      prk:prk(),
+      hdg:hdg(),
+      time:time()
+    });
+  }
 
-    render();
+  render();
 }
 
 function render(){
-    let list = document.getElementById("list");
-    list.innerHTML = "";
 
-    flights.forEach((f, i)=>{
-        let div = document.createElement("div");
-        div.className = "strip";
-        div.draggable = true;
-        div.dataset.index = i;
+  const list=document.getElementById("list");
+  list.innerHTML="";
 
-        div.innerHTML =
-`
-${f.type}    ALT:0    Loc:
-${f.id}    HDG:${f.hdg}    Prk:${f.prk}
-${f.time}    GS:0    RWY:${f.rwy}    A9
+  flights.forEach((f,i)=>{
+
+    const div=document.createElement("div");
+    div.className="strip";
+    div.draggable=true;
+    div.dataset.index=i;
+
+    div.innerHTML=`
+<div>${f.type}  ALT:0  Loc:</div>
+<div>${f.id}  HDG:${f.hdg}  Prk:${f.prk}</div>
+<div>${f.time}  GS:0  RWY:${f.rwy}  A9</div>
 `;
 
-        div.addEventListener("dragstart", dragStart);
-        div.addEventListener("dragover", dragOver);
-        div.addEventListener("drop", drop);
-
-        list.appendChild(div);
+    div.addEventListener("dragstart",e=>{
+      dragged=div;
     });
-}
 
-let dragged;
+    div.addEventListener("dragover",e=>{
+      e.preventDefault();
+    });
 
-function dragStart(e){
-    dragged = e.target;
-}
+    div.addEventListener("drop",e=>{
+      e.preventDefault();
 
-function dragOver(e){
-    e.preventDefault();
-}
+      const list=document.getElementById("list");
 
-function drop(e){
-    e.preventDefault();
-    let list = document.getElementById("list");
+      if(dragged!==div){
 
-    if(dragged !== e.target){
-        let nodes = Array.from(list.children);
-        let draggedIndex = nodes.indexOf(dragged);
-        let targetIndex = nodes.indexOf(e.target);
+        let nodes=[...list.children];
+        let a=nodes.indexOf(dragged);
+        let b=nodes.indexOf(div);
 
-        if(draggedIndex < targetIndex){
-            list.insertBefore(dragged, e.target.nextSibling);
-        } else {
-            list.insertBefore(dragged, e.target);
+        if(a<b){
+          list.insertBefore(dragged,div.nextSibling);
+        }else{
+          list.insertBefore(dragged,div);
         }
-    }
+      }
+    });
+
+    list.appendChild(div);
+  });
 }
+
+let dragged=null;
 
 function evaluate(){
 
-    let nodes = Array.from(document.querySelectorAll(".strip"));
+  const nodes=[...document.querySelectorAll(".strip")];
 
-    let order = nodes.map(n => n.innerText);
+  const order=nodes.map(n=>n.innerText);
 
-    let best = simulate(flights).score;
+  document.getElementById("result").innerText=
+`CHECK DONE
 
-    let user = simulateFromOrder(nodes);
+Flights sorted: ${order.length}
 
-    let res = document.getElementById("result");
-
-    res.innerText =
-`YOUR SCORE: ${user.score}
-BEST SCORE: ${best}
-LOSS: ${user.score - best}`;
-}
-
-// simplified scoring (placeholder for full logic expansion)
-function simulateFromOrder(nodes){
-    return {score: Math.floor(Math.random()*10 + 5)};
-}
-
-function simulate(f){
-    return {score: 5};
+(Logic engine kommt als nächster Schritt)
+`;
 }
 
 </script>
