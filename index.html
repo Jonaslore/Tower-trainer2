@@ -121,14 +121,14 @@ function render(){
 function evaluate(){
 
   if(order.length === 0){
-    document.getElementById("result").innerText = "Press Generate first.";
+    document.getElementById("result").innerText = "❌ No flights. Press Generate.";
     return;
   }
 
-  let text = "RESULT\n\nOrder:\n";
+  let text = "RESULT\n\n";
 
-  for(let f of order){
-    text += f.id + "\n";
+  for(let i = 0; i < order.length; i++){
+    text += (i+1) + ". " + order[i].id + "\n";
   }
 
   document.getElementById("result").innerText = text;
