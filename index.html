@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC MAX MODE V6.3</title>
+<title>ATC MAX MODE V7</title>
 
 <style>
 body{
@@ -51,10 +51,9 @@ select{
 
 <body>
 
-<h2>ATC Trainer V6.3 – MAX MODE</h2>
+<h2>ATC Trainer V7 – MAX MODE</h2>
 
 <button onclick="generate()">Generate</button>
-<button onclick="evaluate()">Evaluate</button>
 <button onclick="check()">Check Optimal</button>
 
 <div id="list"></div>
@@ -65,7 +64,6 @@ select{
 let order=[];
 let selected=null;
 
-// ---------------- DATA ----------------
 const airlines=["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
 const types=["A320","A321","B738","E190","A388","C130","GLEX","C56X","EUROFIGHTER"];
 const runways=["06","24"];
@@ -75,7 +73,6 @@ const intersections=["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"];
 
 function rand(a){return a[Math.floor(Math.random()*a.length)];}
 
-// ---------------- WAKE CLASS ----------------
 function wake(t){
   if(t==="A388") return "JUMBO";
   if(t==="C130") return "HEAVY";
@@ -83,7 +80,6 @@ function wake(t){
   return "LIGHT";
 }
 
-// ---------------- DIRECTION ----------------
 function dir(f){
   if(f.rwy==="24"){
     if(f.route==="NOKAR"||f.route==="MARIO") return "R";
@@ -97,72 +93,41 @@ function dir(f){
   return "S";
 }
 
-// ---------------- INTERSECTION VALID ----------------
 function valid(f){
   return !(f.intersection.startsWith("B") && f.type!=="EUROFIGHTER" && f.type!=="C130");
 }
 
-// ---------------- CORE RULE (MAX ONLY) ----------------
+// 🔥 MAX RULE COST
 function cost(a,b){
 
   const A=wake(a.type);
   const B=wake(b.type);
 
   let wakeCost=0;
-
   if(B==="LIGHT" && A!=="LIGHT") wakeCost=1;
   if(B==="MEDIUM" && A==="HEAVY") wakeCost=2;
   if(B==="LIGHT" && A==="JUMBO") wakeCost=3;
 
   let routeCost = (a.route===b.route) ? 0 : 2;
-
   let dirCost = (dir(a)===dir(b) && dir(a)!=="S") ? 1 : 0;
 
-  // 🔥 FINAL RULE: ONLY MAX COUNTS
   return Math.max(wakeCost, routeCost, dirCost);
 }
 
-// ---------------- TOTAL TIME (SIMULATION STYLE) ----------------
 function total(arr){
-
   let t=0;
-
   for(let i=0;i<arr.length-1;i++){
     t += cost(arr[i],arr[i+1]);
   }
-
   return t;
 }
 
-// ---------------- GREEDY OPT ----------------
-function greedy(arr){
-
-  let r=[...arr];
-  let out=[r.splice(0,1)[0]];
-
-  while(r.length){
-
-    let best=0,bestScore=9999;
-
-    for(let i=0;i<r.length;i++){
-      let s=cost(out[out.length-1],r[i]);
-      if(s<bestScore){bestScore=s;best=i;}
-    }
-
-    out.push(r.splice(best,1)[0]);
-  }
-
-  return out;
-}
-
-// ---------------- OPTIMAL (FULL SEARCH small N) ----------------
 function optimal(arr){
 
   let best=null;
   let bestScore=999999;
 
   function perm(a,cur=[]){
-
     if(a.length===0){
       let s=total(cur);
       if(s<bestScore){
@@ -180,8 +145,44 @@ function optimal(arr){
   }
 
   perm(arr);
-
   return best;
+}
+
+// ---------------- EXPLANATION ENGINE ----------------
+function explainDiff(user,opt){
+
+  let diff = total(user) - total(opt);
+
+  if(diff <= 0){
+    return "Perfekt – keine unnötigen Flow-Konflikte.";
+  }
+
+  let out=[];
+
+  for(let i=0;i<user.length-1;i++){
+
+    let u = cost(user[i],user[i+1]);
+    let o = cost(opt[i],opt[i+1]);
+
+    if(u > o){
+
+      let a=user[i], b=user[i+1];
+
+      let msg = a.id+" → "+b.id+" erzeugt unnötigen Delay.";
+
+      if(a.route === b.route){
+        msg += " Grund: gleiche Route (Flow-Block z.B. EGGIB/RONAL).";
+      } else if(wake(a.type)!==wake(b.type)){
+        msg += " Grund: Wake-Kette ineffizient.";
+      } else {
+        msg += " Grund: Richtung/Flow nicht optimal.";
+      }
+
+      out.push(msg);
+    }
+  }
+
+  return out.join("\n");
 }
 
 // ---------------- GENERATE ----------------
@@ -220,8 +221,7 @@ function render(){
 
     div.innerHTML=
       "<b>"+f.id+"</b><br>"+
-      "Type: "+f.type+" | RWY: "+f.rwy+"<br>"+
-      "Route: "+f.route+"<br>"+
+      f.type+" | "+f.route+"<br>"+
       "INT: "+f.intersection;
 
     const sel=document.createElement("select");
@@ -252,20 +252,6 @@ function render(){
   });
 }
 
-// ---------------- EVALUATE ----------------
-function evaluate(){
-
-  let u=total(order);
-  let o=total(optimal(order));
-
-  result.innerText=
-`RESULT
-
-Your cost: ${u}
-Optimal: ${o}
-Diff: ${u-o}`;
-}
-
 // ---------------- CHECK ----------------
 function check(){
 
@@ -283,14 +269,14 @@ function check(){
       const div=document.createElement("div");
       div.className="strip";
 
-      let ok=order[i].id===opt[i].id;
+      let ok = order[i].id === opt[i].id;
 
-      div.style.borderColor=ok?"lime":"orange";
+      div.style.borderColor = ok ? "lime" : "orange";
 
-      div.innerHTML=
+      div.innerHTML =
         "<b>"+f.id+"</b><br>"+
         "USER INT: "+f.intersection+"<br>"+
-        "OPT FLOW: "+opt[i].intersection;
+        "OPT INT: "+opt[i].intersection;
 
       list.appendChild(div);
     });
@@ -304,14 +290,26 @@ function check(){
       div.className="strip";
       div.style.borderColor="cyan";
 
-      div.innerHTML=
+      div.innerHTML =
         "<b>"+f.id+"</b><br>"+
-        "TYPE: "+f.type+" | INT:"+f.intersection;
+        f.type+" | "+f.route+" | "+f.intersection;
 
       list.appendChild(div);
     });
 
-    result.innerText+="\nDONE";
+    let explanation = explainDiff(order,opt);
+
+    result.innerText =
+`RESULT
+
+Your cost: ${total(order)}
+Optimal: ${total(opt)}
+
+DIFFERENCE: ${total(order)-total(opt)}
+
+WHY:
+
+${explanation}`;
 
   },400);
 }
