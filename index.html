@@ -223,6 +223,14 @@ function evaluate(){
   if(diff > 2) rating = "MID";
   if(diff > 5) rating = "BAD";
 
+  // 🔥 VISUAL FEEDBACK (WICHTIG!)
+  document.querySelectorAll(".strip").forEach(el=>{
+    el.style.borderColor =
+      rating === "GOOD" ? "#2ecc71" :
+      rating === "MID" ? "#f1c40f" :
+      "#e74c3c";
+  });
+
   document.getElementById("result").innerText =
 `RESULT
 
