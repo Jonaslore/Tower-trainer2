@@ -120,9 +120,7 @@ function getAllowedIntersections(f){
   function isIntersectionDeparture(f){
   if(f.rwy==="24"){
     return (
-      f.intersection==="A6" ||
-      f.intersection==="B4"
-    );
+      f.intersection==="A6" || f.intersection==="B4" ;
   }
   if(f.rwy==="06"){
     return (
@@ -207,12 +205,11 @@ function cost(a,b){
   if(
     delay>0 &&
  
-  isIntersectionDeparture(b)
-  ){
-    delay++;
-  }
-  return delay;
+if(delay > 0 && isIntersectionDeparture(b)){
+ delay++;
 }
+  return delay;
+} 
 // ---------------- TOTAL COST ----------------
 function total(arr){
   let t=0;
@@ -224,23 +221,11 @@ function total(arr){
 
 // ---------------- GENERATE ----------------
 function generate(){
-
   order=[];
   selected=null;
-
-  let rwy=rand(runways);
-
-  function generate(){
-
-  order=[];
-  selected=null;
-
-  let rwy=rand(runways);
-
+  let rwy = rand(runways);
   for(let i=0;i<6;i++){
-
     let type = rand(types);
-
     let temp = {
       id: rand(airlines)+Math.floor(Math.random()*900),
       type: type,
@@ -248,31 +233,11 @@ function generate(){
       route: rand(routes),
       intersection: ""
     };
-
-    temp.intersection =
-      getAllowedIntersections(temp)[0];
-
+    temp.intersection = getAllowedIntersections(temp)[0];
     order.push(temp);
   }
-
   render();
 }
-let temp = {
-  id:rand(airlines)+Math.floor(Math.random()*900),
-  type:type,
-  rwy:rwy,
-  route:rand(routes),
-  intersection:""
-};
-
-temp.intersection =
-  getAllowedIntersections(temp)[0];
-
-order.push(temp);
-    });
-  }
-  render();
-
 // ---------------- RENDER ----------------
 function render(){
 
