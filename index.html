@@ -76,6 +76,55 @@ const routes=["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
 // ---------------- UTILS ----------------
 function rand(a){return a[Math.floor(Math.random()*a.length)];}
 
+// ---------------- EXPLANATION LAYER ----------------
+
+function explainOrder(arr){
+
+  let lines = [];
+
+  for(let i=0;i<arr.length-1;i++){
+
+    let a = arr[i];
+
+    let b = arr[i+1];
+
+    let reasons = [];
+
+    const A = wake(a.type);
+
+    const B = wake(b.type);
+
+    if(A==="HEAVY" && B==="MEDIUM")
+
+      reasons.push("Wake turbulence (HEAVY → MEDIUM)");
+
+    if(A==="JUMBO" && B==="HEAVY")
+
+      reasons.push("Wake turbulence (JUMBO → HEAVY)");
+
+    if(dir(a) === dir(b))
+
+      reasons.push("Same flow direction");
+
+    if(a.rwy==="06" && a.route==="MARIO")
+
+      reasons.push("MARIO penalty on RWY 06");
+
+    if(isIntersectionDeparture(b))
+
+      reasons.push("Intersection departure constraint");
+
+    if(reasons.length === 0)
+
+      reasons.push("No major penalty");
+
+    lines.push(`${a.id} → ${b.id}: ${reasons.join(" | ")}`);
+
+  }
+
+  return lines;
+}
+  
 // ---------------- WAKE ----------------
 function wake(t){
   if(t==="A388") return "JUMBO";
@@ -302,10 +351,17 @@ function check(){
   document.getElementById("result").innerText =
 `RESULT
 
+let explanation = explainOrder(opt).join("\n");
+
+document.getElementById("result").innerText =
+`RESULT
+
 Your cost: ${total(order)}
 Optimal: ${total(opt)}
-Difference: ${total(order)-total(opt)}`;
-}
+Difference: ${total(order)-total(opt)}
+
+--- OPTIMAL REASONING ---
+${explanation}`;
 
 </script>
 
