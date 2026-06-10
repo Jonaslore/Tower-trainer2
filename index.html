@@ -68,7 +68,19 @@ let order=[];
 let selected=null;
 
 const airlines=["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
-const types=["A320","A321","B738","E190","A388","C130"];
+const types=[
+"A320",
+"A321",
+"B738",
+"E190",
+"A388",
+"B747",
+"C17",
+"A400M",
+"GLEX",
+"C56X",
+"EUROFIGHTER"
+];
 const runways=["06","24"];
 const routes=["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
 
@@ -77,38 +89,117 @@ const intersections=["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"];
 function rand(a){return a[Math.floor(Math.random()*a.length)];}
 
 // ---------------- WAKE ----------------
-function wake(t){
-  if(t==="A388") return "JUMBO";
-  if(t==="C130") return "HEAVY";
+function Wake(t){
+
+  if(t==="A388")
+    return "JUMBO";
+  if(
+    t==="B747" ||
+    t==="C17" ||
+    t==="A400M"
+  )
+  return "HEAVY";
   return "MEDIUM";
 }
+function getAllowedIntersections(f){
 
+  const bravoOnly =
+    f.type==="EUROFIGHTER" ||
+    f.type==="C17" ||
+    f.type==="A400M";
+
+  const bothSides =
+    f.type==="A388" ||
+    f.type==="B747";
+
+  if(f.rwy==="24"){
+
+    if(bravoOnly)
+      return ["B4","B5"];
+
+    if(bothSides)
+      return ["A6","A8","A9","B4","B5"];
+
+    return ["A6","A8","A9"];
+  }
+
+  if(f.rwy==="06"){
+
+    if(bravoOnly)
+      return ["B1","B2"];
+
+    if(bothSides)
+      return ["A1","A2","A3","A4","B1","B2"];
+
+    return ["A1","A2","A3","A4"];
+  }
+
+  return [];
+}
 // ---------------- DIRECTION ----------------
 function dir(f){
   if(f.rwy==="24"){
-    if(f.route==="NOKAR"||f.route==="MARIO") return "R";
+    if(
+      f.route==="NOKAR" ||
+      f.route==="MARIO"
+    ) return "R";
     return "L";
+  }
+  if(f.rwy==="06"){
+    if(f.route==="NOKAR")
+      return "L";
+    if(f.route==="MARIO")
+      return "S";
+    return "R";
   }
   return "S";
 }
 
 // ---------------- MAX RULE COST ----------------
 function cost(a,b){
-
-  const A=wake(a.type);
-  const B=wake(b.type);
-
-  let wakeCost=0;
-  if(B==="LIGHT" && A!=="LIGHT") wakeCost=1;
-  if(B==="MEDIUM" && A==="HEAVY") wakeCost=2;
-  if(B==="LIGHT" && A==="JUMBO") wakeCost=3;
-
-  let routeCost = (a.route===b.route) ? 0 : 2;
-  let dirCost = (dir(a)===dir(b) && dir(a)!=="S") ? 1 : 0;
-
-  return Math.max(wakeCost, routeCost, dirCost);
+  let wakeCost = 0;
+  const A = wake(a.type);
+  const B = wake(b.type);
+  if(A==="HEAVY" && B==="MEDIUM")
+    wakeCost = 2;
+  if(A==="JUMBO" && B==="HEAVY")
+    wakeCost = 2;
+  if(
+    A==="JUMBO" &&
+    B==="MEDIUM"
+  )
+    wakeCost = 3;
+  let routeCost = 0;
+  // gleiche Richtung
+  if(
+    dir(a)==="R" &&
+    dir(b)==="R"
+  )
+    routeCost = 2;
+  if(
+    dir(a)==="L" &&
+    dir(b)==="L"
+  )
+    routeCost = 2;
+  // MARIO auf 06
+  if(
+    a.rwy==="06" &&
+    a.route==="MARIO"
+  )
+    routeCost = 2;
+  let delay =
+    Math.max(
+      wakeCost,
+      routeCost
+    );
+  if(
+    delay>0 &&
+    isIntersectionDeparture(b)
+  ){
+    delay++;
+  }
+  return delay;
 }
-
 // ---------------- TOTAL COST ----------------
 function total(arr){
   let t=0;
@@ -137,10 +228,28 @@ function generate(){
   }
 
   render();
+  getAllowedIntersections(f).forEach(x=>{
+}
+  function isIntersectionDeparture(f){
+  if(f.rwy==="24"){
+    return (
+      f.intersection==="A6" ||
+      f.intersection==="B4"
+    );
+  }
+  if(f.rwy==="06"){
+    return (
+      f.intersection==="A3" ||
+      f.intersection==="A4" ||
+      f.intersection==="B1" ||
+      f.intersection==="B2"
+    );
+  }
+  return false;
 }
 
 // ---------------- RENDER ----------------
-function render(){
+function render(){f
 
   const list=document.getElementById("list");
   list.innerHTML="";
@@ -164,7 +273,8 @@ function render(){
 
     div.innerHTML=
       "<b>"+f.id+"</b><br>"+
-      "RWY: "+f.rwy+" | "+f.type+"<br>"+
+      "RWY: "+f.rwy+" | "+f.type+
+      " | "+wake(f.type)+"<br>"+
       "Route: "+f.route;
 
     // 🔥 INTERSECTION SELECTOR
