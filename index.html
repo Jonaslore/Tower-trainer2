@@ -102,27 +102,22 @@ function wake(t){
   return "MEDIUM";
 }
 function getAllowedIntersections(f){
-
   const bravoOnly =
     f.type==="EUROFIGHTER" ||
     f.type==="C17" ||
     f.type==="A400M";
-
   const bothSides =
     f.type==="A388" ||
     f.type==="B747";
-
   if(f.rwy==="24"){
-
     if(bravoOnly)
       return ["B4","B5"];
-
     if(bothSides)
       return ["A6","A8","A9","B4","B5"];
-
     return ["A6","A8","A9"];
   }
-    function isIntersectionDeparture(f){
+  
+  function isIntersectionDeparture(f){
   if(f.rwy==="24"){
     return (
       f.intersection==="A6" ||
@@ -235,13 +230,33 @@ function generate(){
 
   let rwy=rand(runways);
 
+  function generate(){
+
+  order=[];
+  selected=null;
+
+  let rwy=rand(runways);
+
   for(let i=0;i<6;i++){
-    order.push({
-      id:rand(airlines)+Math.floor(Math.random()*900),
-      type:rand(types),
-      rwy,
-      route:rand(routes),
-      let type = rand(types);
+
+    let type = rand(types);
+
+    let temp = {
+      id: rand(airlines)+Math.floor(Math.random()*900),
+      type: type,
+      rwy: rwy,
+      route: rand(routes),
+      intersection: ""
+    };
+
+    temp.intersection =
+      getAllowedIntersections(temp)[0];
+
+    order.push(temp);
+  }
+
+  render();
+}
 let temp = {
   id:rand(airlines)+Math.floor(Math.random()*900),
   type:type,
