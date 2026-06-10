@@ -89,7 +89,7 @@ const intersections=["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"];
 function rand(a){return a[Math.floor(Math.random()*a.length)];}
 
 // ---------------- WAKE ----------------
-function Wake(t){
+function wake(t){
 
   if(t==="A388")
     return "JUMBO";
@@ -122,6 +122,23 @@ function getAllowedIntersections(f){
 
     return ["A6","A8","A9"];
   }
+    function isIntersectionDeparture(f){
+  if(f.rwy==="24"){
+    return (
+      f.intersection==="A6" ||
+      f.intersection==="B4"
+    );
+  }
+  if(f.rwy==="06"){
+    return (
+      f.intersection==="A3" ||
+      f.intersection==="A4" ||
+      f.intersection==="B1" ||
+      f.intersection==="B2"
+    );
+  }
+  return false;
+}
 
   if(f.rwy==="06"){
 
@@ -194,7 +211,8 @@ function cost(a,b){
     );
   if(
     delay>0 &&
-    isIntersectionDeparture(b)
+ 
+  isIntersectionDeparture(b)
   ){
     delay++;
   }
@@ -223,33 +241,25 @@ function generate(){
       type:rand(types),
       rwy,
       route:rand(routes),
-      intersection:rand(intersections)
+      let type = rand(types);
+let temp = {
+  id:rand(airlines)+Math.floor(Math.random()*900),
+  type:type,
+  rwy:rwy,
+  route:rand(routes),
+  intersection:""
+};
+
+temp.intersection =
+  getAllowedIntersections(temp)[0];
+
+order.push(temp);
     });
   }
-
   render();
-  getAllowedIntersections(f).forEach(x=>{
-}
-  function isIntersectionDeparture(f){
-  if(f.rwy==="24"){
-    return (
-      f.intersection==="A6" ||
-      f.intersection==="B4"
-    );
-  }
-  if(f.rwy==="06"){
-    return (
-      f.intersection==="A3" ||
-      f.intersection==="A4" ||
-      f.intersection==="B1" ||
-      f.intersection==="B2"
-    );
-  }
-  return false;
-}
 
 // ---------------- RENDER ----------------
-function render(){f
+function render(){
 
   const list=document.getElementById("list");
   list.innerHTML="";
@@ -280,7 +290,7 @@ function render(){f
     // 🔥 INTERSECTION SELECTOR
     const sel=document.createElement("select");
 
-    intersections.forEach(x=>{
+    getAllowedIntersections(f).forEach(x=>{
       let o=document.createElement("option");
       o.value=x;
       o.text=x;
