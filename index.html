@@ -2,14 +2,13 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Trainer V10 CLEAN</title>
+<title>ATC Trainer V11</title>
 
 <style>
 body{
   font-family: Arial;
   background:#111;
   color:white;
-  padding:20px;
   padding:20px;
 }
 
@@ -55,7 +54,7 @@ select{
 
 <body>
 
-<h2>ATC Trainer V10 – CLEAN</h2>
+<h2>ATC Trainer V10.1 – CLEAN</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="check()">Check</button>
@@ -74,57 +73,47 @@ const runways=["06","24"];
 const routes=["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
 
 // ---------------- UTILS ----------------
-function rand(a){return a[Math.floor(Math.random()*a.length)];}
+function rand(a){
+  return a[Math.floor(Math.random()*a.length)];
+}
 
 // ---------------- EXPLANATION LAYER ----------------
-
 function explainOrder(arr){
-
   let lines = [];
 
   for(let i=0;i<arr.length-1;i++){
-
     let a = arr[i];
-
     let b = arr[i+1];
 
     let reasons = [];
 
     const A = wake(a.type);
-
     const B = wake(b.type);
 
     if(A==="HEAVY" && B==="MEDIUM")
-
-      reasons.push("Wake turbulence (HEAVY → MEDIUM)");
+      reasons.push("Wake: HEAVY → MEDIUM");
 
     if(A==="JUMBO" && B==="HEAVY")
-
-      reasons.push("Wake turbulence (JUMBO → HEAVY)");
+      reasons.push("Wake: JUMBO → HEAVY");
 
     if(dir(a) === dir(b))
-
       reasons.push("Same flow direction");
 
     if(a.rwy==="06" && a.route==="MARIO")
-
-      reasons.push("MARIO penalty on RWY 06");
+      reasons.push("MARIO runway penalty");
 
     if(isIntersectionDeparture(b))
-
       reasons.push("Intersection departure constraint");
 
     if(reasons.length === 0)
-
-      reasons.push("No major penalty");
+      reasons.push("No major constraint");
 
     lines.push(`${a.id} → ${b.id}: ${reasons.join(" | ")}`);
-
   }
 
   return lines;
 }
-  
+
 // ---------------- WAKE ----------------
 function wake(t){
   if(t==="A388") return "JUMBO";
@@ -176,7 +165,7 @@ function getAllowedIntersections(f){
   return [];
 }
 
-// ---------------- COST FUNCTION ----------------
+// ---------------- COST ----------------
 function cost(a,b){
 
   let wakeCost = 0;
@@ -189,8 +178,7 @@ function cost(a,b){
 
   let routeCost = 0;
 
-  if(dir(a)==="R" && dir(b)==="R") routeCost = 2;
-  if(dir(a)==="L" && dir(b)==="L") routeCost = 2;
+  if(dir(a) === dir(b)) routeCost = 2;
 
   if(a.rwy==="06" && a.route==="MARIO") routeCost += 1;
 
@@ -203,11 +191,11 @@ function cost(a,b){
   return delay;
 }
 
-// ---------------- TOTAL COST ----------------
+// ---------------- TOTAL ----------------
 function total(arr){
   let t = 0;
   for(let i=0;i<arr.length-1;i++){
-    t += cost(arr[i],arr[i+1]);
+    t += cost(arr[i], arr[i+1]);
   }
   return t;
 }
@@ -218,7 +206,7 @@ function generate(){
   order = [];
   selected = null;
 
-  let rwy = rand(runways);
+  let rwy = rand(["06","24"]);
 
   for(let i=0;i<6;i++){
     let f = {
@@ -236,7 +224,7 @@ function generate(){
   render();
 }
 
-// ---------------- OPTIMIZER (HILL CLIMB) ----------------
+// ---------------- SIMPLE OPTIMIZER ----------------
 function optimize(arr){
 
   let improved = true;
@@ -348,20 +336,18 @@ function check(){
     list.appendChild(div);
   });
 
+  const explanation = explainOrder(opt).join("\n");
+
   document.getElementById("result").innerText =
-`RESULT
-
-let explanation = explainOrder(opt).join("\n");
-
-document.getElementById("result").innerText =
 `RESULT
 
 Your cost: ${total(order)}
 Optimal: ${total(opt)}
 Difference: ${total(order)-total(opt)}
 
---- OPTIMAL REASONING ---
+--- REASONING ---
 ${explanation}`;
+}
 
 </script>
 
