@@ -2,13 +2,14 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Trainer V9 EXAM MODE</title>
+<title>ATC Trainer V10 CLEAN</title>
 
 <style>
 body{
   font-family: Arial;
   background:#111;
   color:white;
+  padding:20px;
   padding:20px;
 }
 
@@ -54,165 +55,108 @@ select{
 
 <body>
 
-<h2>ATC Trainer V9 – EXAM MODE</h2>
+<h2>ATC Trainer V10 – CLEAN</h2>
 
 <button onclick="generate()">Generate</button>
-<button onclick="check()">Check Exam</button>
+<button onclick="check()">Check</button>
 
 <div id="list"></div>
 <div class="result" id="result"></div>
 
 <script>
 
-let order=[];
-let selected=null;
+let order = [];
+let selected = null;
 
 const airlines=["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
-const types=[
-"A320",
-"A321",
-"B738",
-"E190",
-"A388",
-"B747",
-"C17",
-"A400M",
-"GLEX",
-"C56X",
-"EUROFIGHTER"
-];
+const types=["A320","A321","B738","E190","A388","B747","C17","A400M","GLEX","C56X","EUROFIGHTER"];
 const runways=["06","24"];
 const routes=["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
 
-const intersections=["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"];
-
+// ---------------- UTILS ----------------
 function rand(a){return a[Math.floor(Math.random()*a.length)];}
 
 // ---------------- WAKE ----------------
 function wake(t){
-
-  if(t==="A388")
-    return "JUMBO";
-  if(
-    t==="B747" ||
-    t==="C17" ||
-    t==="A400M"
-  )
-  return "HEAVY";
+  if(t==="A388") return "JUMBO";
+  if(["B747","C17","A400M"].includes(t)) return "HEAVY";
   return "MEDIUM";
 }
-function getAllowedIntersections(f){
-  const bravoOnly =
-    f.type==="EUROFIGHTER" ||
-    f.type==="C17" ||
-    f.type==="A400M";
-  const bothSides =
-    f.type==="A388" ||
-    f.type==="B747";
-  if(f.rwy==="24"){
-    if(bravoOnly)
-      return ["B4","B5"];
-    if(bothSides)
-      return ["A6","A8","A9","B4","B5"];
-    return ["A6","A8","A9"];
-  }
-  
-  function isIntersectionDeparture(f){
-  if(f.rwy==="24"){
-    return (
-      f.intersection==="A6" || f.intersection==="B4" ;
-  }
-  if(f.rwy==="06"){
-    return (
-      f.intersection==="A3" ||
-      f.intersection==="A4" ||
-      f.intersection==="B1" ||
-      f.intersection==="B2"
-    );
-  }
-  return false;
-}
 
-  if(f.rwy==="06"){
-
-    if(bravoOnly)
-      return ["B1","B2"];
-
-    if(bothSides)
-      return ["A1","A2","A3","A4","B1","B2"];
-
-    return ["A1","A2","A3","A4"];
-  }
-
-  return [];
-}
 // ---------------- DIRECTION ----------------
 function dir(f){
   if(f.rwy==="24"){
-    if(
-      f.route==="NOKAR" ||
-      f.route==="MARIO"
-    ) return "R";
-    return "L";
+    return (f.route==="NOKAR" || f.route==="MARIO") ? "R" : "L";
   }
   if(f.rwy==="06"){
-    if(f.route==="NOKAR")
-      return "L";
-    if(f.route==="MARIO")
-      return "S";
+    if(f.route==="NOKAR") return "L";
+    if(f.route==="MARIO") return "S";
     return "R";
   }
   return "S";
 }
 
-// ---------------- MAX RULE COST ----------------
+// ---------------- INTERSECTION RULE ----------------
+function isIntersectionDeparture(f){
+  if(f.rwy==="24"){
+    return ["A6","B4"].includes(f.intersection);
+  }
+  if(f.rwy==="06"){
+    return ["A3","A4","B1","B2"].includes(f.intersection);
+  }
+  return false;
+}
+
+// ---------------- ALLOWED INTERSECTIONS ----------------
+function getAllowedIntersections(f){
+  const bravoOnly = ["EUROFIGHTER","C17","A400M"].includes(f.type);
+  const bothSides = ["A388","B747"].includes(f.type);
+
+  if(f.rwy==="24"){
+    if(bravoOnly) return ["B4","B5"];
+    if(bothSides) return ["A6","A8","A9","B4","B5"];
+    return ["A6","A8","A9"];
+  }
+
+  if(f.rwy==="06"){
+    if(bravoOnly) return ["B1","B2"];
+    if(bothSides) return ["A1","A2","A3","A4","B1","B2"];
+    return ["A1","A2","A3","A4"];
+  }
+
+  return [];
+}
+
+// ---------------- COST FUNCTION ----------------
 function cost(a,b){
+
   let wakeCost = 0;
   const A = wake(a.type);
   const B = wake(b.type);
-  if(A==="HEAVY" && B==="MEDIUM")
-    wakeCost = 2;
-  if(A==="JUMBO" && B==="HEAVY")
-    wakeCost = 2;
-  if(
-    A==="JUMBO" &&
-    B==="MEDIUM"
-  )
-    wakeCost = 3;
+
+  if(A==="HEAVY" && B==="MEDIUM") wakeCost = 2;
+  if(A==="JUMBO" && B==="HEAVY") wakeCost = 2;
+  if(A==="JUMBO" && B==="MEDIUM") wakeCost = 3;
+
   let routeCost = 0;
-  // gleiche Richtung
-  if(
-    dir(a)==="R" &&
-    dir(b)==="R"
-  )
-    routeCost = 2;
-  if(
-    dir(a)==="L" &&
-    dir(b)==="L"
-  )
-    routeCost = 2;
-  // MARIO auf 06
-  if(
-    a.rwy==="06" &&
-    a.route==="MARIO"
-  )
-    routeCost = 2;
-  let delay =
-    Math.max(
-      wakeCost,
-      routeCost
-    );
-  if(
-    delay>0 &&
- 
-if(delay > 0 && isIntersectionDeparture(b)){
- delay++;
-}
+
+  if(dir(a)==="R" && dir(b)==="R") routeCost = 2;
+  if(dir(a)==="L" && dir(b)==="L") routeCost = 2;
+
+  if(a.rwy==="06" && a.route==="MARIO") routeCost += 1;
+
+  let delay = Math.max(wakeCost, routeCost);
+
+  if(delay > 0 && isIntersectionDeparture(b)){
+    delay += 1;
+  }
+
   return delay;
-} 
+}
+
 // ---------------- TOTAL COST ----------------
 function total(arr){
-  let t=0;
+  let t = 0;
   for(let i=0;i<arr.length-1;i++){
     t += cost(arr[i],arr[i+1]);
   }
@@ -221,74 +165,96 @@ function total(arr){
 
 // ---------------- GENERATE ----------------
 function generate(){
-  order=[];
-  selected=null;
+
+  order = [];
+  selected = null;
+
   let rwy = rand(runways);
+
   for(let i=0;i<6;i++){
-    let type = rand(types);
-    let temp = {
+    let f = {
       id: rand(airlines)+Math.floor(Math.random()*900),
-      type: type,
+      type: rand(types),
       rwy: rwy,
       route: rand(routes),
       intersection: ""
     };
-    temp.intersection = getAllowedIntersections(temp)[0];
-    order.push(temp);
+
+    f.intersection = getAllowedIntersections(f)[0];
+    order.push(f);
   }
+
   render();
 }
+
+// ---------------- OPTIMIZER (HILL CLIMB) ----------------
+function optimize(arr){
+
+  let improved = true;
+
+  while(improved){
+    improved = false;
+
+    for(let i=0;i<arr.length;i++){
+      for(let j=i+1;j<arr.length;j++){
+
+        let copy = [...arr];
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+
+        if(total(copy) < total(arr)){
+          arr = copy;
+          improved = true;
+        }
+      }
+    }
+  }
+
+  return arr;
+}
+
 // ---------------- RENDER ----------------
 function render(){
 
-  const list=document.getElementById("list");
-  list.innerHTML="";
+  const list = document.getElementById("list");
+  list.innerHTML = "";
 
   order.forEach((f,i)=>{
 
-    const div=document.createElement("div");
-    div.className="strip";
+    const div = document.createElement("div");
+    div.className = "strip";
 
-    let c="";
-
-    if(i<order.length-1){
-      let s=cost(order[i],order[i+1]);
-
-      if(s>=3) c="bad";
-      else if(s===2) c="warn";
-      else c="good";
+    if(i < order.length-1){
+      let c = cost(order[i], order[i+1]);
+      div.classList.add(c>=3 ? "bad" : c===2 ? "warn" : "good");
     }
 
-    div.classList.add(c);
+    div.innerHTML =
+      `<b>${f.id}</b><br>
+      RWY: ${f.rwy} | ${f.type} | ${wake(f.type)}<br>
+      Route: ${f.route}`;
 
-    div.innerHTML=
-      "<b>"+f.id+"</b><br>"+
-      "RWY: "+f.rwy+" | "+f.type+
-      " | "+wake(f.type)+"<br>"+
-      "Route: "+f.route;
-
-    // 🔥 INTERSECTION SELECTOR
-    const sel=document.createElement("select");
+    const sel = document.createElement("select");
 
     getAllowedIntersections(f).forEach(x=>{
-      let o=document.createElement("option");
-      o.value=x;
-      o.text=x;
-      if(x===f.intersection)o.selected=true;
+      let o = document.createElement("option");
+      o.value = x;
+      o.text = x;
+      if(x === f.intersection) o.selected = true;
       sel.appendChild(o);
     });
 
-    sel.onchange=e=>{
-      order[i].intersection=e.target.value;
+    sel.onchange = e => {
+      order[i].intersection = e.target.value;
+      e.stopPropagation();
     };
 
     div.appendChild(sel);
 
-    div.onclick=()=>{
-      if(selected===null) selected=i;
+    div.onclick = () => {
+      if(selected === null) selected = i;
       else{
-        [order[selected],order[i]]=[order[i],order[selected]];
-        selected=null;
+        [order[selected], order[i]] = [order[i], order[selected]];
+        selected = null;
         render();
       }
     };
@@ -297,81 +263,48 @@ function render(){
   });
 }
 
-// ---------------- CHECK (EXAM MODE) ----------------
+// ---------------- CHECK ----------------
 function check(){
 
-  let opt = optimal(order);
+  let opt = optimize([...order]);
 
-  const list=document.getElementById("list");
-  list.innerHTML="";
+  const list = document.getElementById("list");
+  list.innerHTML = "";
 
   order.forEach((f,i)=>{
 
-    const div=document.createElement("div");
-    div.className="strip";
+    const div = document.createElement("div");
+    div.className = "strip";
 
     let ok = order[i].id === opt[i].id;
-
     div.classList.add(ok ? "best" : "bad");
 
-    div.innerHTML=
-      "<b>"+f.id+"</b><br>"+
-      "USER INT: "+f.intersection+"<br>"+
-      "OPT INT: "+opt[i].intersection+"<br>"+
-      "TYPE: "+f.type+" | RWY: "+f.rwy;
+    div.innerHTML =
+      `<b>${f.id}</b><br>
+      USER INT: ${f.intersection}<br>
+      OPT INT: ${opt[i].intersection}<br>
+      TYPE: ${f.type} | RWY: ${f.rwy}`;
 
     list.appendChild(div);
   });
 
-  const title=document.createElement("div");
-  title.innerHTML="<h3>OPTIMAL SEQUENCE</h3>";
+  const title = document.createElement("div");
+  title.innerHTML = "<h3>OPTIMAL SEQUENCE</h3>";
   list.appendChild(title);
 
   opt.forEach(f=>{
-    const div=document.createElement("div");
-    div.className="strip best";
-
-    div.innerHTML=
-      "<b>"+f.id+"</b><br>"+
-      f.type+" | "+f.route+" | "+f.intersection;
-
+    const div = document.createElement("div");
+    div.className = "strip best";
+    div.innerHTML = `<b>${f.id}</b><br>${f.type} | ${f.route} | ${f.intersection}`;
     list.appendChild(div);
   });
 
-  result.innerText =
+  document.getElementById("result").innerText =
 `RESULT
 
 Your cost: ${total(order)}
 Optimal: ${total(opt)}
 Difference: ${total(order)-total(opt)}`;
-
-}
-
-// ---------------- OPTIMAL SOLVER ----------------
-function optimal(arr){
-
-  let best=null;
-  let bestScore=999999;
-
-  function perm(a,cur=[]){
-    if(a.length===0){
-      let s=total(cur);
-      if(s<bestScore){
-        bestScore=s;
-        best=cur;
-      }
-      return;
-    }
-
-    for(let i=0;i<a.length;i++){
-      let copy=[...a];
-      let item=copy.splice(i,1)[0];
-      perm(copy,[...cur,item]);
-    }
-  }
-
-  perm(arr);
-  return best;
 }
 
 </script>
