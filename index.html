@@ -260,11 +260,6 @@ function render(){
     const div = document.createElement("div");
     div.className = "strip";
 
-    if(i < order.length-1){
-      let c = cost(order[i], order[i+1]);
-      div.classList.add(c>=3 ? "bad" : c===2 ? "warn" : "good");
-    }
-
     div.innerHTML =
       `<b>${f.id}</b><br>
       RWY: ${f.rwy} | ${f.type} | ${wake(f.type)}<br>
@@ -338,15 +333,35 @@ function check(){
 
   const explanation = explainOrder(opt).join("\n");
 
-  document.getElementById("result").innerText =
+  let userCost = total(order);
+let optCost = total(opt);
+
+let diff = userCost - optCost;
+
+let verdict =
+  diff === 0
+    ? "Deine Reihenfolge ist bereits optimal."
+    : diff > 0
+      ? "Die optimale Reihenfolge ist besser als deine."
+      : "Deine Reihenfolge ist sogar besser als die berechnete Referenz (selten).";
+
+let reasons = explainOrder(opt).slice(0, 5).join("\n");
+
+document.getElementById("result").innerText =
 `RESULT
 
-Your cost: ${total(order)}
-Optimal: ${total(opt)}
-Difference: ${total(order)-total(opt)}
+${verdict}
 
---- REASONING ---
-${explanation}`;
+Warum:
+Die Optimierung reduziert systematisch Konflikte zwischen aufeinanderfolgenden Flugbewegungen.
+Der Hauptgewinn entsteht durch Minimierung von Wake-Turbulence- und Flow-Konflikten.
+
+Your cost: ${userCost}
+Optimal: ${optCost}
+Difference: ${diff}
+
+--- TOP OPTIMAL REASONS ---
+${reasons}`;
 }
 
 </script>
