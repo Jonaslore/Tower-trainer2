@@ -32,11 +32,6 @@ button{
   cursor:pointer;
 }
 
-.bad{ border-color:red !important; }
-.warn{ border-color:orange !important; }
-.good{ border-color:#444 !important; }
-.best{ border-color:lime !important; }
-
 select{
   margin-top:6px;
   padding:4px;
@@ -54,7 +49,7 @@ select{
 
 <body>
 
-<h2>ATC Trainer V10.1 – CLEAN</h2>
+<h2>ATC Trainer V11 – Instructor Mode</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="check()">Check</button>
@@ -72,46 +67,8 @@ const types=["A320","A321","B738","E190","A388","B747","C17","A400M","GLEX","C56
 const runways=["06","24"];
 const routes=["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
 
-// ---------------- UTILS ----------------
 function rand(a){
   return a[Math.floor(Math.random()*a.length)];
-}
-
-// ---------------- EXPLANATION LAYER ----------------
-function explainOrder(arr){
-  let lines = [];
-
-  for(let i=0;i<arr.length-1;i++){
-    let a = arr[i];
-    let b = arr[i+1];
-
-    let reasons = [];
-
-    const A = wake(a.type);
-    const B = wake(b.type);
-
-    if(A==="HEAVY" && B==="MEDIUM")
-      reasons.push("Wake: HEAVY → MEDIUM");
-
-    if(A==="JUMBO" && B==="HEAVY")
-      reasons.push("Wake: JUMBO → HEAVY");
-
-    if(dir(a) === dir(b))
-      reasons.push("Same flow direction");
-
-    if(a.rwy==="06" && a.route==="MARIO")
-      reasons.push("MARIO runway penalty");
-
-    if(isIntersectionDeparture(b))
-      reasons.push("Intersection departure constraint");
-
-    if(reasons.length === 0)
-      reasons.push("No major constraint");
-
-    lines.push(`${a.id} → ${b.id}: ${reasons.join(" | ")}`);
-  }
-
-  return lines;
 }
 
 // ---------------- WAKE ----------------
@@ -134,7 +91,7 @@ function dir(f){
   return "S";
 }
 
-// ---------------- INTERSECTION RULE ----------------
+// ---------------- INTERSECTION ----------------
 function isIntersectionDeparture(f){
   if(f.rwy==="24"){
     return ["A6","B4"].includes(f.intersection);
@@ -151,7 +108,7 @@ function getAllowedIntersections(f){
   const bothSides = ["A388","B747"].includes(f.type);
 
   if(f.rwy==="24"){
-    if(bravoOnly) return ["B5","B4"];
+    if(bravoOnly) return ["B4","B5"];
     if(bothSides) return ["A9","A8","A6","B5","B4"];
     return ["A9","A8","A6"];
   }
@@ -180,15 +137,17 @@ function cost(a,b){
 
   if(dir(a) === dir(b)) routeCost = 2;
 
-  if(a.rwy==="06" && a.route==="MARIO") routeCost += 1;
+  if(a.rwy==="06" && a.route==="MARIO")
+    routeCost = Math.max(routeCost,2);
 
-  let delay = Math.max(wakeCost, routeCost);
+  let base = Math.max(wakeCost, routeCost);
 
-  if(delay > 0 && isIntersectionDeparture(b)){
-    delay += 1;
-  }
+  let intersectionCost = 0;
 
-  return delay;
+  if(base > 0 && isIntersectionDeparture(b))
+    intersectionCost = 1;
+
+  return base + intersectionCost;
 }
 
 // ---------------- TOTAL ----------------
@@ -206,7 +165,7 @@ function generate(){
   order = [];
   selected = null;
 
-  let rwy = rand(["06","24"]);
+  let rwy = rand(runways);
 
   for(let i=0;i<6;i++){
     let f = {
@@ -224,7 +183,55 @@ function generate(){
   render();
 }
 
-// ---------------- SIMPLE OPTIMIZER ----------------
+// ---------------- EXPLANATION ----------------
+function explainOrder(arr){
+
+  let lines = [];
+
+  for(let i=0;i<arr.length-1;i++){
+
+    let a = arr[i];
+    let b = arr[i+1];
+
+    let wakeCost = 0;
+    let routeCost = 0;
+    let intersectionCost = 0;
+
+    const A = wake(a.type);
+    const B = wake(b.type);
+
+    if(A==="HEAVY" && B==="MEDIUM") wakeCost = 2;
+    if(A==="JUMBO" && B==="HEAVY") wakeCost = 2;
+    if(A==="JUMBO" && B==="MEDIUM") wakeCost = 3;
+
+    if(dir(a)===dir(b)) routeCost = 2;
+
+    if(a.rwy==="06" && a.route==="MARIO")
+      routeCost = Math.max(routeCost,2);
+
+    let base = Math.max(wakeCost, routeCost);
+
+    if(base>0 && isIntersectionDeparture(b))
+      intersectionCost = 1;
+
+    let totalSep = base + intersectionCost;
+
+    let reasons = [];
+
+    if(wakeCost) reasons.push(`Wake ${wakeCost}`);
+    if(routeCost) reasons.push(`Route ${routeCost}`);
+    if(intersectionCost) reasons.push(`Intersection +1`);
+
+    if(reasons.length===0)
+      reasons.push("No separation");
+
+    lines.push(`${a.id} → ${b.id} = ${totalSep} min (${reasons.join(", ")})`);
+  }
+
+  return lines;
+}
+
+// ---------------- OPTIMIZE ----------------
 function optimize(arr){
 
   let improved = true;
@@ -262,7 +269,7 @@ function render(){
 
     div.innerHTML =
       `<b>${f.id}</b><br>
-      RWY: ${f.rwy} | ${f.type} | ${wake(f.type)}<br>
+      RWY: ${f.rwy} | ${f.type}<br>
       Route: ${f.route}`;
 
     const sel = document.createElement("select");
@@ -275,14 +282,14 @@ function render(){
       sel.appendChild(o);
     });
 
-    sel.onchange = e => {
+    sel.onchange = e=>{
       order[i].intersection = e.target.value;
       e.stopPropagation();
     };
 
     div.appendChild(sel);
 
-    div.onclick = () => {
+    div.onclick = ()=>{
       if(selected === null) selected = i;
       else{
         [order[selected], order[i]] = [order[i], order[selected]];
@@ -308,9 +315,6 @@ function check(){
     const div = document.createElement("div");
     div.className = "strip";
 
-    let ok = order[i].id === opt[i].id;
-    div.classList.add(ok ? "best" : "bad");
-
     div.innerHTML =
       `<b>${f.id}</b><br>
       USER INT: ${f.intersection}<br>
@@ -320,48 +324,24 @@ function check(){
     list.appendChild(div);
   });
 
-  const title = document.createElement("div");
-  title.innerHTML = "<h3>OPTIMAL SEQUENCE</h3>";
-  list.appendChild(title);
+  list.appendChild(document.createElement("h3")).innerText = "OPTIMAL SEQUENCE";
 
   opt.forEach(f=>{
     const div = document.createElement("div");
-    div.className = "strip best";
+    div.className = "strip";
     div.innerHTML = `<b>${f.id}</b><br>${f.type} | ${f.route} | ${f.intersection}`;
     list.appendChild(div);
   });
 
-  const explanation = explainOrder(opt).join("\n");
-
-  let userCost = total(order);
-let optCost = total(opt);
-
-let diff = userCost - optCost;
-
-let verdict =
-  diff === 0
-    ? "Deine Reihenfolge ist bereits optimal."
-    : diff > 0
-      ? "Die optimale Reihenfolge ist besser als deine."
-      : "Deine Reihenfolge ist sogar besser als die berechnete Referenz (selten).";
-
-let reasons = explainOrder(opt).slice(0, 5).join("\n");
-
-document.getElementById("result").innerText =
+  document.getElementById("result").innerText =
 `RESULT
 
-${verdict}
+Your cost: ${total(order)}
+Optimal cost: ${total(opt)}
+Difference: ${total(order)-total(opt)}
 
-Warum:
-Die Optimierung reduziert systematisch Konflikte zwischen aufeinanderfolgenden Flugbewegungen.
-Der Hauptgewinn entsteht durch Minimierung von Wake-Turbulence- und Flow-Konflikten.
-
-Your cost: ${userCost}
-Optimal: ${optCost}
-Difference: ${diff}
-
---- TOP OPTIMAL REASONS ---
-${reasons}`;
+--- DETAIL ---
+${explainOrder(opt).join("\n")}`;
 }
 
 </script>
