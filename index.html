@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Trainer V11.1</title>
+<title>ATC Trainer V11</title>
 
 <style>
 body{
@@ -49,7 +49,7 @@ select{
 
 <body>
 
-<h2>ATC Trainer V11.1 – Instructor Mode</h2>
+<h2>ATC Trainer V11 – FINAL</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="check()">Check</button>
@@ -64,8 +64,8 @@ let selected = null;
 
 const airlines=["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
 const types=["A320","A321","B738","E190","A388","B747","C17","A400M","GLEX","C56X","EUROFIGHTER"];
-const routes=["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
 const runways=["06","24"];
+const routes=["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
 
 function rand(a){
   return a[Math.floor(Math.random()*a.length)];
@@ -91,7 +91,7 @@ function dir(f){
   return "S";
 }
 
-// ---------------- INTERSECTION ----------------
+// ---------------- INTERSECTION RULE ----------------
 function isIntersectionDeparture(f){
   if(f.rwy==="24"){
     return ["A6","B4"].includes(f.intersection);
@@ -100,6 +100,26 @@ function isIntersectionDeparture(f){
     return ["A3","A4","B1","B2"].includes(f.intersection);
   }
   return false;
+}
+
+// ---------------- ALLOWED INTERSECTIONS ----------------
+function getAllowedIntersections(f){
+  const bravoOnly = ["EUROFIGHTER","C17","A400M"].includes(f.type);
+  const bothSides = ["A388","B747"].includes(f.type);
+
+  if(f.rwy==="24"){
+    if(bravoOnly) return ["B4","B5"];
+    if(bothSides) return ["A9","A8","A6","B5","B4"];
+    return ["A9","A8","A6"];
+  }
+
+  if(f.rwy==="06"){
+    if(bravoOnly) return ["B1","B2"];
+    if(bothSides) return ["A1","A2","A3","A4","B1","B2"];
+    return ["A1","A2","A3","A4"];
+  }
+
+  return [];
 }
 
 // ---------------- COST ----------------
@@ -122,10 +142,17 @@ function cost(a,b){
 
   let base = Math.max(wakeCost, routeCost);
 
+  // ---------------- INTERSECTION FIX ----------------
   let intersectionCost = 0;
 
-  if(base > 0 && isIntersectionDeparture(b))
+  if(isIntersectionDeparture(b)){
     intersectionCost = 1;
+
+    // nur anwenden wenn überhaupt Konflikt besteht
+    if(base === 0){
+      intersectionCost = 0;
+    }
+  }
 
   return base + intersectionCost;
 }
@@ -156,7 +183,9 @@ function generate(){
       intersection: ""
     };
 
-    f.intersection = ["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"][0];
+    let allowed = getAllowedIntersections(f);
+    f.intersection = allowed[0];
+
     order.push(f);
   }
 
@@ -188,78 +217,6 @@ function optimize(arr){
   return arr;
 }
 
-// ---------------- PAIR ANALYSIS ----------------
-function pairReport(arr){
-
-  let lines = [];
-
-  for(let i=0;i<arr.length;i++){
-    for(let j=i+1;j<arr.length;j++){
-
-      let a = arr[i];
-      let b = arr[j];
-
-      let delay = cost(a,b);
-
-      if(delay > 0){
-        let reasons = [];
-
-        const A = wake(a.type);
-        const B = wake(b.type);
-
-        if(A==="HEAVY" && B==="MEDIUM") reasons.push("Wake H→M");
-        if(A==="JUMBO" && B==="HEAVY") reasons.push("Wake J→H");
-        if(A==="JUMBO" && B==="MEDIUM") reasons.push("Wake J→M");
-
-        if(dir(a)===dir(b)) reasons.push("Same direction");
-
-        if(a.rwy==="06" && a.route==="MARIO") reasons.push("MARIO rule");
-
-        if(isIntersectionDeparture(b)) reasons.push("Intersection +1");
-
-        lines.push(`${a.id} → ${b.id} = ${delay} min (${reasons.join(", ")})`);
-      } else {
-        lines.push(`${a.id} → ${b.id} = 0 min`);
-      }
-    }
-  }
-
-  return lines;
-}
-
-// ---------------- WHY OPTIMAL ----------------
-function whyOptimal(user,opt){
-
-  let lines=[];
-
-  for(let i=0;i<user.length;i++){
-
-    if(user[i].id !== opt[i].id){
-
-      let uImpact=0;
-      let oImpact=0;
-
-      for(let j=0;j<user.length;j++){
-        if(i!==j) uImpact += cost(user[i],user[j]);
-      }
-
-      for(let j=0;j<opt.length;j++){
-        if(i!==j) oImpact += cost(opt[i],opt[j]);
-      }
-
-      lines.push(
-`${user[i].id} → position replaced by ${opt[i].id}
-Reason: reduces downstream separation conflicts
-Saved impact: ${uImpact - oImpact} min`
-      );
-    }
-  }
-
-  if(lines.length===0) return ["Already optimal"];
-
-  return lines;
-}
-
 // ---------------- RENDER ----------------
 function render(){
 
@@ -275,6 +232,23 @@ function render(){
       `<b>${f.id}</b><br>
       RWY: ${f.rwy} | ${f.type} | ${wake(f.type)}<br>
       Route: ${f.route}`;
+
+    const sel=document.createElement("select");
+
+    getAllowedIntersections(f).forEach(x=>{
+      let o=document.createElement("option");
+      o.value=x;
+      o.text=x;
+      if(x===f.intersection) o.selected=true;
+      sel.appendChild(o);
+    });
+
+    sel.onchange=e=>{
+      order[i].intersection = e.target.value;
+      e.stopPropagation();
+    };
+
+    div.appendChild(sel);
 
     div.onclick=()=>{
       if(selected===null) selected=i;
@@ -319,7 +293,7 @@ function check(){
   opt.forEach(f=>{
     let div=document.createElement("div");
     div.className="strip";
-    div.innerHTML=`<b>${f.id}</b><br>${f.type} | ${f.route}`;
+    div.innerHTML=`<b>${f.id}</b><br>${f.type} | ${f.route} | ${f.intersection}`;
     list.appendChild(div);
   });
 
@@ -328,13 +302,7 @@ function check(){
 
 Your cost: ${total(order)}
 Optimal cost: ${total(opt)}
-Difference: ${total(order)-total(opt)}
-
---- PAIR ANALYSIS ---
-${pairReport(order).slice(0,12).join("\n")}
-
---- WHY OPTIMAL ---
-${whyOptimal(order,opt).join("\n")}`;
+Difference: ${total(order)-total(opt)}`;
 }
 
 </script>
