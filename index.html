@@ -151,9 +151,9 @@ function getAllowedIntersections(f){
   const bothSides = ["A388","B747"].includes(f.type);
 
   if(f.rwy==="24"){
-    if(bravoOnly) return ["B4","B5"];
-    if(bothSides) return ["A6","A8","A9","B4","B5"];
-    return ["A6","A8","A9"];
+    if(bravoOnly) return ["B5","B4"];
+    if(bothSides) return ["A9","A8","A6","B5","B4"];
+    return ["A9","A8","A6"];
   }
 
   if(f.rwy==="06"){
