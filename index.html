@@ -183,54 +183,6 @@ function generate(){
   render();
 }
 
-// ---------------- EXPLANATION ----------------
-function explainOrder(arr){
-
-  let lines = [];
-
-  for(let i=0;i<arr.length-1;i++){
-
-    let a = arr[i];
-    let b = arr[i+1];
-
-    let wakeCost = 0;
-    let routeCost = 0;
-    let intersectionCost = 0;
-
-    const A = wake(a.type);
-    const B = wake(b.type);
-
-    if(A==="HEAVY" && B==="MEDIUM") wakeCost = 2;
-    if(A==="JUMBO" && B==="HEAVY") wakeCost = 2;
-    if(A==="JUMBO" && B==="MEDIUM") wakeCost = 3;
-
-    if(dir(a)===dir(b)) routeCost = 2;
-
-    if(a.rwy==="06" && a.route==="MARIO")
-      routeCost = Math.max(routeCost,2);
-
-    let base = Math.max(wakeCost, routeCost);
-
-    if(base>0 && isIntersectionDeparture(b))
-      intersectionCost = 1;
-
-    let totalSep = base + intersectionCost;
-
-    let reasons = [];
-
-    if(wakeCost) reasons.push(`Wake ${wakeCost}`);
-    if(routeCost) reasons.push(`Route ${routeCost}`);
-    if(intersectionCost) reasons.push(`Intersection +1`);
-
-    if(reasons.length===0)
-      reasons.push("No separation");
-
-    lines.push(`${a.id} → ${b.id} = ${totalSep} min (${reasons.join(", ")})`);
-  }
-
-  return lines;
-}
-
 // ---------------- OPTIMIZE ----------------
 function optimize(arr){
 
@@ -269,7 +221,7 @@ function render(){
 
     div.innerHTML =
       `<b>${f.id}</b><br>
-      RWY: ${f.rwy} | ${f.type}<br>
+      RWY: ${f.rwy} | ${f.type} | ${wake(f.type)}<br>
       Route: ${f.route}`;
 
     const sel = document.createElement("select");
@@ -315,11 +267,14 @@ function check(){
     const div = document.createElement("div");
     div.className = "strip";
 
+    let ok = order[i].id === opt[i].id;
+    div.style.borderColor = ok ? "lime" : "red";
+
     div.innerHTML =
       `<b>${f.id}</b><br>
       USER INT: ${f.intersection}<br>
       OPT INT: ${opt[i].intersection}<br>
-      TYPE: ${f.type} | RWY: ${f.rwy}`;
+      TYPE: ${f.type} | RWY: ${f.rwy} | ${wake(f.type)}`;
 
     list.appendChild(div);
   });
@@ -338,10 +293,7 @@ function check(){
 
 Your cost: ${total(order)}
 Optimal cost: ${total(opt)}
-Difference: ${total(order)-total(opt)}
-
---- DETAIL ---
-${explainOrder(opt).join("\n")}`;
+Difference: ${total(order)-total(opt)}`;
 }
 
 </script>
