@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Trainer V11</title>
+<title>ATC Trainer V11 FINAL</title>
 
 <style>
 body{
@@ -49,7 +49,7 @@ select{
 
 <body>
 
-<h2>ATC Trainer V11 – LIGHT FIX</h2>
+<h2>ATC Trainer V11 – FINAL</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="check()">Check</button>
@@ -98,15 +98,33 @@ function dir(f){
   return "S";
 }
 
-// ---------------- INTERSECTION ----------------
+// ---------------- INTERSECTION RULE ----------------
 function isIntersectionDeparture(f){
   if(f.rwy==="24"){
-    return ["A6","B4"].includes(f.intersection);
+    return ["A9","B5"].includes(f.intersection);
   }
   if(f.rwy==="06"){
-    return ["A3","A4","B1","B2"].includes(f.intersection);
+    return ["A1","B1"].includes(f.intersection);
   }
   return false;
+}
+
+// ---------------- ALLOWED INTERSECTIONS ----------------
+function getAllowedIntersections(f){
+
+  const military = ["EUROFIGHTER","C17","A400M"].includes(f.type);
+
+  if(f.rwy==="24"){
+    if(military) return ["B5"];
+    return ["A9"];
+  }
+
+  if(f.rwy==="06"){
+    if(military) return ["B1"];
+    return ["A1"];
+  }
+
+  return [];
 }
 
 // ---------------- COST ----------------
@@ -117,19 +135,15 @@ function cost(a,b){
   const A = wake(a.type);
   const B = wake(b.type);
 
-  // JUMBO
   if(A==="JUMBO" && B==="HEAVY") wakeCost = 2;
   if(A==="JUMBO" && B==="MEDIUM") wakeCost = 3;
   if(A==="JUMBO" && B==="LIGHT") wakeCost = 3;
 
-  // HEAVY
   if(A==="HEAVY" && B==="MEDIUM") wakeCost = 2;
   if(A==="HEAVY" && B==="LIGHT") wakeCost = 2;
 
-  // MEDIUM
   if(A==="MEDIUM" && B==="LIGHT") wakeCost = 0;
 
-  // LIGHT
   if(A==="LIGHT" && B==="MEDIUM") wakeCost = 2;
   if(A==="LIGHT" && B==="HEAVY") wakeCost = 2;
   if(A==="LIGHT" && B==="JUMBO") wakeCost = 3;
@@ -147,7 +161,15 @@ function cost(a,b){
 
   if(isIntersectionDeparture(b)){
     intersectionCost = 1;
-    if(base === 0) intersectionCost = 0;
+
+    // LIGHT penalty smarter
+    if(wake(b.type) === "LIGHT" && base > 0){
+      intersectionCost = 2;
+    }
+
+    if(base === 0){
+      intersectionCost = 0;
+    }
   }
 
   return base + intersectionCost;
@@ -179,7 +201,7 @@ function generate(){
       intersection: ""
     };
 
-    f.intersection = ["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"][0];
+    f.intersection = getAllowedIntersections(f)[0];
     order.push(f);
   }
 
@@ -229,7 +251,7 @@ function render(){
 
     const sel=document.createElement("select");
 
-    ["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"].forEach(x=>{
+    getAllowedIntersections(f).forEach(x=>{
       let o=document.createElement("option");
       o.value=x;
       o.text=x;
@@ -291,12 +313,25 @@ function check(){
     list.appendChild(div);
   });
 
+  let why = [];
+
+  for(let i=0;i<order.length;i++){
+    if(order[i].id !== opt[i].id){
+      why.push(
+`${order[i].id} → replaced by ${opt[i].id}: reduces wake + route + intersection conflicts`
+      );
+    }
+  }
+
   document.getElementById("result").innerText =
 `RESULT
 
 Your cost: ${total(order)}
 Optimal cost: ${total(opt)}
-Difference: ${total(order)-total(opt)}`;
+Difference: ${total(order)-total(opt)}
+
+--- WHY OPTIMAL ---
+${why.length ? why.join("\n") : "Already optimal sequence"}`;
 }
 
 </script>
