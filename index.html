@@ -91,7 +91,7 @@ function dir(f){
   return "S";
 }
 
-// ---------------- INTERSECTION RULE ----------------
+// ---------------- INTERSECTION ----------------
 function isIntersectionDeparture(f){
   if(f.rwy==="24"){
     return ["A6","B4"].includes(f.intersection);
@@ -100,26 +100,6 @@ function isIntersectionDeparture(f){
     return ["A3","A4","B1","B2"].includes(f.intersection);
   }
   return false;
-}
-
-// ---------------- ALLOWED INTERSECTIONS ----------------
-function getAllowedIntersections(f){
-  const bravoOnly = ["EUROFIGHTER","C17","A400M"].includes(f.type);
-  const bothSides = ["A388","B747"].includes(f.type);
-
-  if(f.rwy==="24"){
-    if(bravoOnly) return ["B4","B5"];
-    if(bothSides) return ["A9","A8","A6","B5","B4"];
-    return ["A9","A8","A6"];
-  }
-
-  if(f.rwy==="06"){
-    if(bravoOnly) return ["B1","B2"];
-    if(bothSides) return ["A1","A2","A3","A4","B1","B2"];
-    return ["A1","A2","A3","A4"];
-  }
-
-  return [];
 }
 
 // ---------------- COST ----------------
@@ -142,13 +122,10 @@ function cost(a,b){
 
   let base = Math.max(wakeCost, routeCost);
 
-  // ---------------- INTERSECTION FIX ----------------
   let intersectionCost = 0;
 
   if(isIntersectionDeparture(b)){
     intersectionCost = 1;
-
-    // nur anwenden wenn überhaupt Konflikt besteht
     if(base === 0){
       intersectionCost = 0;
     }
@@ -183,9 +160,7 @@ function generate(){
       intersection: ""
     };
 
-    let allowed = getAllowedIntersections(f);
-    f.intersection = allowed[0];
-
+    f.intersection = ["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"][0];
     order.push(f);
   }
 
@@ -235,7 +210,7 @@ function render(){
 
     const sel=document.createElement("select");
 
-    getAllowedIntersections(f).forEach(x=>{
+    ["A1","A2","A3","A4","A6","A8","A9","B1","B2","B4","B5"].forEach(x=>{
       let o=document.createElement("option");
       o.value=x;
       o.text=x;
@@ -293,16 +268,52 @@ function check(){
   opt.forEach(f=>{
     let div=document.createElement("div");
     div.className="strip";
-    div.innerHTML=`<b>${f.id}</b><br>${f.type} | ${f.route} | ${f.intersection}`;
+    div.innerHTML=`<b>${f.id}</b><br>${f.type} | ${f.route}`;
     list.appendChild(div);
   });
+
+  // ---------------- EXPLANATION RESTORED ----------------
+
+  let pairAnalysis = [];
+
+  for(let i=0;i<order.length;i++){
+    for(let j=i+1;j<order.length;j++){
+
+      let a = order[i];
+      let b = order[j];
+
+      let d = cost(a,b);
+
+      if(d > 0){
+        pairAnalysis.push(
+`${a.id} → ${b.id} = ${d} min`
+        );
+      }
+    }
+  }
+
+  let why = [];
+
+  for(let i=0;i<order.length;i++){
+    if(order[i].id !== opt[i].id){
+      why.push(
+`${order[i].id} moved → reduces cumulative separation conflicts`
+      );
+    }
+  }
 
   document.getElementById("result").innerText =
 `RESULT
 
 Your cost: ${total(order)}
 Optimal cost: ${total(opt)}
-Difference: ${total(order)-total(opt)}`;
+Difference: ${total(order)-total(opt)}
+
+--- PAIR ANALYSIS ---
+${pairAnalysis.slice(0,12).join("\n")}
+
+--- WHY OPTIMAL ---
+${why.length ? why.join("\n") : "Already optimal sequence"}`;
 }
 
 </script>
