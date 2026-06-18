@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Trainer V12 – STABLE LEVEL 2</title>
+<title>ATC Trainer V12 – STABLE FIXED</title>
 
 <style>
 body{
@@ -49,7 +49,7 @@ select{
 
 <body>
 
-<h2>ATC Trainer V12 – STABLE LEVEL 2</h2>
+<h2>ATC Trainer V12 – STABLE FIXED</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="check()">Check</button>
@@ -67,6 +67,7 @@ const types=["A320","A321","B738","E190","A388","B747","C17","A400M","GLEX","C56
 const runways=["06","24"];
 const routes=["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
 
+// ---------------- RANDOM ----------------
 function rand(a){
   return a[Math.floor(Math.random()*a.length)];
 }
@@ -79,7 +80,7 @@ function wake(t){
   return "MEDIUM";
 }
 
-// ---------------- RANK ----------------
+// ---------------- PRIORITY ----------------
 function rank(t){
   if(["SR22","C172","DA40","DA42"].includes(t)) return 0;
   if(["E190","A320","A321","B738","GLEX","C56X"].includes(t)) return 1;
@@ -88,13 +89,13 @@ function rank(t){
   return 1;
 }
 
-// ---------------- FLOW (RWY SAFE) ----------------
+// ---------------- FLOW GROUP ----------------
 function routeGroup(f){
 
-  // RWY 24 = neutral (IMPORTANT FIX)
-  if(f.rwy === "24") return 1;
+  if(f.rwy === "24"){
+    return 1; // TRUE NEUTRAL RWY 24
+  }
 
-  // RWY 06 = structured flow
   if(f.rwy === "06"){
     if(f.route === "EGGIB") return 1;
     if(f.route === "RONAL") return 1;
@@ -148,9 +149,10 @@ function isIntersectionDeparture(f){
   return false;
 }
 
-// ---------------- COST ----------------
+// ---------------- COST MODEL (FIXED CLEAN SEPARATION) ----------------
 function cost(a,b){
 
+  // ---------------- WAKE (A → B ONLY) ----------------
   let wakeCost = 0;
 
   const A = wake(a.type);
@@ -169,6 +171,7 @@ function cost(a,b){
   else if(A==="LIGHT" && B==="HEAVY") wakeCost = 2;
   else if(A==="LIGHT" && B==="JUMBO") wakeCost = 3;
 
+  // ---------------- ROUTE / FLOW ----------------
   let routeCost = 0;
 
   if(dir(a) === dir(b)) routeCost = 2;
@@ -176,23 +179,21 @@ function cost(a,b){
   if(a.rwy==="06" && a.route==="MARIO")
     routeCost = Math.max(routeCost,2);
 
-  let base = Math.max(wakeCost, routeCost);
+  const separationCost = Math.max(wakeCost, routeCost);
 
+  // ---------------- INTERSECTION (ONLY B, NO BACK-PROPAGATION) ----------------
   let intersectionCost = 0;
 
   if(isIntersectionDeparture(b)){
+
     intersectionCost = 1;
 
-    if(wake(b.type)==="LIGHT" && base>0){
+    if(wake(b.type)==="LIGHT" && separationCost > 0){
       intersectionCost = 2;
-    }
-
-    if(base===0){
-      intersectionCost = 0;
     }
   }
 
-  return base + intersectionCost;
+  return separationCost + intersectionCost;
 }
 
 // ---------------- GLOBAL SEQUENCE EVALUATION ----------------
@@ -204,7 +205,7 @@ function evaluateSequence(arr){
     total += cost(arr[i], arr[i+1]);
   }
 
-  // stability bonus (flow consistency)
+  // smooth flow penalty
   for(let i=0;i<arr.length-2;i++){
 
     const a = arr[i];
@@ -220,7 +221,7 @@ function evaluateSequence(arr){
     }
   }
 
-  // adjacency reward (keeps flow stable)
+  // stability reward
   for(let i=0;i<arr.length-1;i++){
     if(routeGroup(arr[i]) === routeGroup(arr[i+1])){
       total -= 1;
@@ -230,7 +231,7 @@ function evaluateSequence(arr){
   return total;
 }
 
-// ---------------- OPTIMIZER (GLOBAL STABLE SEARCH) ----------------
+// ---------------- OPTIMIZER ----------------
 function optimize(arr){
 
   let best = [...arr];
@@ -245,9 +246,9 @@ function optimize(arr){
       for(let j=i+1;j<best.length;j++){
 
         let copy = [...best];
-        [copy[i], copy[j]] = [copy[j], copy[i]];
+        [copy[i],copy[j]] = [copy[j],copy[i]];
 
-        const c = evaluateSequence(copy);
+        let c = evaluateSequence(copy);
 
         if(c < bestCost){
           best = copy;
