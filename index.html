@@ -75,23 +75,30 @@ function rand(a){
 function wake(t){
 
   if(t==="A388") return "JUMBO";
-
-  if(["B747","C17","A400M"].includes(t))
-    return "HEAVY";
-
-  if(["SR22","C172","DA40","DA42"].includes(t))
-    return "LIGHT";
-
+  if(["B747","C17","A400M"].includes(t)) return "HEAVY";
+  if(["SR22","C172","DA40","DA42"].includes(t)) return "LIGHT";
   return "MEDIUM";
 }
 
-// ---------------- PRIORITY RANK (NEW) ----------------
+// ---------------- PRIORITY ----------------
 function rank(type){
 
-  if(["SR22","C172","DA40","DA42"].includes(type)) return 0; // LIGHT
-  if(["E190","A320","A321","B738","GLEX","C56X"].includes(type)) return 1; // MEDIUM
-  if(["B747","C17","A400M"].includes(type)) return 2; // HEAVY
-  if(type==="A388") return 3; // JUMBO
+  if(["SR22","C172","DA40","DA42"].includes(type)) return 0;
+  if(["E190","A320","A321","B738","GLEX","C56X"].includes(type)) return 1;
+  if(["B747","C17","A400M"].includes(type)) return 2;
+  if(type==="A388") return 3;
+
+  return 1;
+}
+
+// ---------------- ROUTE FLOW GROUP (NEW CORE LOGIC) ----------------
+function routeGroup(r){
+
+  if(r==="MARIO") return 3;   // "isolated / special"
+  if(r==="NOKAR") return 2;
+  if(r==="EGGIB") return 1;
+  if(r==="RONAL") return 1;
+  if(r==="HAGEN") return 0;
 
   return 1;
 }
@@ -115,34 +122,26 @@ function getAllowedIntersections(f){
   const military =
     ["EUROFIGHTER","C17","A400M"].includes(f.type);
 
-  const b747 = f.type === "B747";
+  const b747 = f.type==="B747";
 
   if(f.rwy==="24"){
 
-    if(military)
-      return ["B5","B4"];
-
-    if(b747)
-      return ["A9","A8","A6","B5","B4"];
-
+    if(military) return ["B5","B4"];
+    if(b747) return ["A9","A8","A6","B5","B4"];
     return ["A9","A8","A6"];
   }
 
   if(f.rwy==="06"){
 
-    if(military)
-      return ["B1","B2"];
-
-    if(b747)
-      return ["A1","A2","A3","A4","B1","B2"];
-
+    if(military) return ["B1","B2"];
+    if(b747) return ["A1","A2","A3","A4","B1","B2"];
     return ["A1","A2","A3","A4"];
   }
 
   return [];
 }
 
-// ---------------- INTERSECTION RULE ----------------
+// ---------------- INTERSECTION DELAY ----------------
 function isIntersectionDeparture(f){
 
   if(f.rwy==="24"){
@@ -156,7 +155,7 @@ function isIntersectionDeparture(f){
   return false;
 }
 
-// ---------------- COST ----------------
+// ---------------- COST (NOW FLOW-AWARE) ----------------
 function cost(a,b){
 
   let wakeCost = 0;
@@ -191,23 +190,32 @@ function cost(a,b){
   if(isIntersectionDeparture(b)){
     intersectionCost = 1;
 
-    if(wake(b.type) === "LIGHT" && base > 0){
+    if(wake(b.type)==="LIGHT" && base>0){
       intersectionCost = 2;
     }
 
-    if(base === 0){
+    if(base===0){
       intersectionCost = 0;
     }
   }
 
-  // ---------------- PRIORITY PENALTY (NEW) ----------------
-  let priorityCost = 0;
+  // ---------------- GLOBAL FLOW PENALTY (NEW CORE FIX) ----------------
+  let flowPenalty = 0;
 
-  if(rank(a.type) > rank(b.type)){
-    priorityCost = 2;
+  const gA = routeGroup(a.route);
+  const gB = routeGroup(b.route);
+
+  // big jump in route hierarchy = bad sequencing
+  if(gA > gB){
+    flowPenalty += 2;
   }
 
-  return base + intersectionCost + priorityCost;
+  // MARIO isolation rule: avoid placing it in middle unless optimal
+  if(b.route==="MARIO" && gA < 3){
+    flowPenalty += 2;
+  }
+
+  return base + intersectionCost + flowPenalty;
 }
 
 // ---------------- TOTAL ----------------
@@ -353,7 +361,7 @@ function check(){
   for(let i=0;i<order.length;i++){
     if(order[i].id !== opt[i].id){
       why.push(
-`${order[i].id} → replaced by ${opt[i].id}: reduces wake + route + intersection conflicts + priority logic`
+`${order[i].id} → replaced by ${opt[i].id}: wake + route flow + intersection + global sequencing`
       );
     }
   }
