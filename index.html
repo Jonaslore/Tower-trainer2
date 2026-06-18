@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Trainer V11 FINAL</title>
+<title>ATC Trainer V12 – STABLE LEVEL 2</title>
 
 <style>
 body{
@@ -49,7 +49,7 @@ select{
 
 <body>
 
-<h2>ATC Trainer V11 – FINAL</h2>
+<h2>ATC Trainer V12 – STABLE LEVEL 2</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="check()">Check</button>
@@ -73,45 +73,33 @@ function rand(a){
 
 // ---------------- WAKE ----------------
 function wake(t){
-
   if(t==="A388") return "JUMBO";
   if(["B747","C17","A400M"].includes(t)) return "HEAVY";
   if(["SR22","C172","DA40","DA42"].includes(t)) return "LIGHT";
   return "MEDIUM";
 }
 
-// ---------------- PRIORITY ----------------
-function rank(type){
-
-  if(["SR22","C172","DA40","DA42"].includes(type)) return 0;
-  if(["E190","A320","A321","B738","GLEX","C56X"].includes(type)) return 1;
-  if(["B747","C17","A400M"].includes(type)) return 2;
-  if(type==="A388") return 3;
-
+// ---------------- RANK ----------------
+function rank(t){
+  if(["SR22","C172","DA40","DA42"].includes(t)) return 0;
+  if(["E190","A320","A321","B738","GLEX","C56X"].includes(t)) return 1;
+  if(["B747","C17","A400M"].includes(t)) return 2;
+  if(t==="A388") return 3;
   return 1;
 }
 
-// ---------------- FLOW GROUP ----------------
+// ---------------- FLOW (RWY SAFE) ----------------
 function routeGroup(f){
 
-  if(f.rwy === "24"){
+  // RWY 24 = neutral (IMPORTANT FIX)
+  if(f.rwy === "24") return 1;
 
-    if(f.route === "EGGIB") return 0;
-    if(f.route === "RONAL") return 0;
-    if(f.route === "NOKAR") return 1;
-    if(f.route === "MARIO") return 1;
-
-    return 1;
-  }
-
+  // RWY 06 = structured flow
   if(f.rwy === "06"){
-
     if(f.route === "EGGIB") return 1;
     if(f.route === "RONAL") return 1;
     if(f.route === "NOKAR") return 2;
     if(f.route === "MARIO") return 3;
-
-    return 1;
   }
 
   return 1;
@@ -133,20 +121,16 @@ function dir(f){
 // ---------------- INTERSECTIONS ----------------
 function getAllowedIntersections(f){
 
-  const military =
-    ["EUROFIGHTER","C17","A400M"].includes(f.type);
-
+  const military = ["EUROFIGHTER","C17","A400M"].includes(f.type);
   const b747 = f.type==="B747";
 
   if(f.rwy==="24"){
-
     if(military) return ["B5","B4"];
     if(b747) return ["A9","A8","A6","B5","B4"];
     return ["A9","A8","A6"];
   }
 
   if(f.rwy==="06"){
-
     if(military) return ["B1","B2"];
     if(b747) return ["A1","A2","A3","A4","B1","B2"];
     return ["A1","A2","A3","A4"];
@@ -158,18 +142,13 @@ function getAllowedIntersections(f){
 // ---------------- INTERSECTION RULE ----------------
 function isIntersectionDeparture(f){
 
-  if(f.rwy==="24"){
-    return ["A6","B4"].includes(f.intersection);
-  }
-
-  if(f.rwy==="06"){
-    return ["A3","A4"].includes(f.intersection);
-  }
+  if(f.rwy==="24") return ["A6","B4"].includes(f.intersection);
+  if(f.rwy==="06") return ["A3","A4"].includes(f.intersection);
 
   return false;
 }
 
-// ---------------- COST (PAIRWISE CORE) ----------------
+// ---------------- COST ----------------
 function cost(a,b){
 
   let wakeCost = 0;
@@ -216,17 +195,16 @@ function cost(a,b){
   return base + intersectionCost;
 }
 
-// ---------------- GLOBAL SEQUENCE EVALUATION (LEVEL 2 CORE) ----------------
+// ---------------- GLOBAL SEQUENCE EVALUATION ----------------
 function evaluateSequence(arr){
 
-  let totalCost = 0;
+  let total = 0;
 
-  // pairwise cost
   for(let i=0;i<arr.length-1;i++){
-    totalCost += cost(arr[i],arr[i+1]);
+    total += cost(arr[i], arr[i+1]);
   }
 
-  // smooth flow penalty
+  // stability bonus (flow consistency)
   for(let i=0;i<arr.length-2;i++){
 
     const a = arr[i];
@@ -238,36 +216,49 @@ function evaluateSequence(arr){
     const gC = routeGroup(c);
 
     if(gA > gB && gB < gC){
-      totalCost += 2;
+      total += 2;
     }
   }
 
-  return totalCost;
+  // adjacency reward (keeps flow stable)
+  for(let i=0;i<arr.length-1;i++){
+    if(routeGroup(arr[i]) === routeGroup(arr[i+1])){
+      total -= 1;
+    }
+  }
+
+  return total;
 }
 
-// ---------------- OPTIMIZER (LEVEL 2) ----------------
+// ---------------- OPTIMIZER (GLOBAL STABLE SEARCH) ----------------
 function optimize(arr){
+
+  let best = [...arr];
+  let bestCost = evaluateSequence(best);
 
   let improved = true;
 
   while(improved){
     improved = false;
 
-    for(let i=0;i<arr.length;i++){
-      for(let j=i+1;j<arr.length;j++){
+    for(let i=0;i<best.length;i++){
+      for(let j=i+1;j<best.length;j++){
 
-        let copy = [...arr];
-        [copy[i],copy[j]] = [copy[j],copy[i]];
+        let copy = [...best];
+        [copy[i], copy[j]] = [copy[j], copy[i]];
 
-        if(evaluateSequence(copy) < evaluateSequence(arr)){
-          arr = copy;
+        const c = evaluateSequence(copy);
+
+        if(c < bestCost){
+          best = copy;
+          bestCost = c;
           improved = true;
         }
       }
     }
   }
 
-  return arr;
+  return best;
 }
 
 // ---------------- TOTAL ----------------
