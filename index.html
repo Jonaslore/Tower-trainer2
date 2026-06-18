@@ -85,6 +85,17 @@ function wake(t){
   return "MEDIUM";
 }
 
+// ---------------- PRIORITY RANK (NEW) ----------------
+function rank(type){
+
+  if(["SR22","C172","DA40","DA42"].includes(type)) return 0; // LIGHT
+  if(["E190","A320","A321","B738","GLEX","C56X"].includes(type)) return 1; // MEDIUM
+  if(["B747","C17","A400M"].includes(type)) return 2; // HEAVY
+  if(type==="A388") return 3; // JUMBO
+
+  return 1;
+}
+
 // ---------------- DIRECTION ----------------
 function dir(f){
   if(f.rwy==="24"){
@@ -98,7 +109,7 @@ function dir(f){
   return "S";
 }
 
-// ---------------- INTERSECTIONS (UPDATED) ----------------
+// ---------------- INTERSECTIONS ----------------
 function getAllowedIntersections(f){
 
   const military =
@@ -131,7 +142,7 @@ function getAllowedIntersections(f){
   return [];
 }
 
-// ---------------- INTERSECTION DELAY LOGIC ----------------
+// ---------------- INTERSECTION RULE ----------------
 function isIntersectionDeparture(f){
 
   if(f.rwy==="24"){
@@ -189,7 +200,14 @@ function cost(a,b){
     }
   }
 
-  return base + intersectionCost;
+  // ---------------- PRIORITY PENALTY (NEW) ----------------
+  let priorityCost = 0;
+
+  if(rank(a.type) > rank(b.type)){
+    priorityCost = 2;
+  }
+
+  return base + intersectionCost + priorityCost;
 }
 
 // ---------------- TOTAL ----------------
@@ -335,7 +353,7 @@ function check(){
   for(let i=0;i<order.length;i++){
     if(order[i].id !== opt[i].id){
       why.push(
-`${order[i].id} → replaced by ${opt[i].id}: reduces wake + route + intersection conflicts`
+`${order[i].id} → replaced by ${opt[i].id}: reduces wake + route + intersection conflicts + priority logic`
       );
     }
   }
