@@ -296,8 +296,8 @@ function check(){
     div.style.borderColor = ok ? "lime" : "red";
 
     div.innerHTML=
-      `<b>${f.id}</b><br>
-      TYPE: ${f.type} | RWY: ${f.rwy}`;
+  `<b>${f.id}</b><br>
+  TYPE: ${f.type} (${wake(f.type)}) | RWY: ${f.rwy}`;
 
     list.appendChild(div);
   });
