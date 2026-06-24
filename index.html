@@ -245,9 +245,9 @@ function render(){
     div.className="strip";
 
     div.innerHTML=
-      `<b>${f.id}</b><br>
-      RWY: ${f.rwy} | ${f.type}<br>
-      Route: ${f.route}`;
+  `<b>${f.id}</b><br>
+  RWY: ${f.rwy} | ${f.type} | ${wake(f.type)}<br>
+  Route: ${f.route}`;
 
     const sel=document.createElement("select");
 
