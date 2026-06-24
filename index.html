@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ATC Trainer V12 – STABLE FIXED</title>
+<title>ATC Trainer V12 – FIXED</title>
 
 <style>
 body{
@@ -49,7 +49,7 @@ select{
 
 <body>
 
-<h2>ATC Trainer V12 – STABLE FIXED</h2>
+<h2>ATC Trainer V12 – FIXED</h2>
 
 <button onclick="generate()">Generate</button>
 <button onclick="check()">Check</button>
@@ -65,7 +65,7 @@ let selected = null;
 const airlines=["AUA","DLH","RYR","ETH","EZY","WZZ","KLM","AFR"];
 const types=["A320","A321","B738","E190","A388","B747","C17","A400M","GLEX","C56X","EUROFIGHTER","SR22","C172","DA40","DA42"];
 const runways=["06","24"];
-const routes=["HAGEN","EGGIB","RONAL","NOKAR","MARIO"];
+const routes=["HAGAN","EGGIB","RONAL","NOKAR","MARIO"];
 
 // ---------------- RANDOM ----------------
 function rand(a){
@@ -80,42 +80,19 @@ function wake(t){
   return "MEDIUM";
 }
 
-// ---------------- PRIORITY ----------------
-function rank(t){
-  if(["SR22","C172","DA40","DA42"].includes(t)) return 0;
-  if(["E190","A320","A321","B738","GLEX","C56X"].includes(t)) return 1;
-  if(["B747","C17","A400M"].includes(t)) return 2;
-  if(t==="A388") return 3;
-  return 1;
-}
-
-// ---------------- FLOW GROUP ----------------
-function routeGroup(f){
-
-  if(f.rwy === "24"){
-    return 1; // TRUE NEUTRAL RWY 24
-  }
-
-  if(f.rwy === "06"){
-    if(f.route === "EGGIB") return 1;
-    if(f.route === "RONAL") return 1;
-    if(f.route === "NOKAR") return 2;
-    if(f.route === "MARIO") return 3;
-  }
-
-  return 1;
-}
-
 // ---------------- DIRECTION ----------------
 function dir(f){
+
   if(f.rwy==="24"){
     return (f.route==="NOKAR" || f.route==="MARIO") ? "R" : "L";
   }
+
   if(f.rwy==="06"){
     if(f.route==="NOKAR") return "L";
     if(f.route==="MARIO") return "S";
     return "R";
   }
+
   return "S";
 }
 
@@ -140,19 +117,10 @@ function getAllowedIntersections(f){
   return [];
 }
 
-// ---------------- INTERSECTION RULE ----------------
-function isIntersectionDeparture(f){
-
-  if(f.rwy==="24") return ["A6","B4"].includes(f.intersection);
-  if(f.rwy==="06") return ["A3","A4"].includes(f.intersection);
-
-  return false;
-}
-
-// ---------------- COST MODEL (FIXED CLEAN SEPARATION) ----------------
+// ---------------- COST ----------------
 function cost(a,b){
 
-  // ---------------- WAKE (A → B ONLY) ----------------
+  // WAKE
   let wakeCost = 0;
 
   const A = wake(a.type);
@@ -165,13 +133,9 @@ function cost(a,b){
   else if(A==="HEAVY" && B==="MEDIUM") wakeCost = 2;
   else if(A==="HEAVY" && B==="LIGHT") wakeCost = 2;
 
-  else if(A==="MEDIUM" && B==="LIGHT") wakeCost = 0;
+  else if(A==="MEDIUM" && B==="LIGHT") wakeCost = 2;
 
-  else if(A==="LIGHT" && B==="MEDIUM") wakeCost = 2;
-  else if(A==="LIGHT" && B==="HEAVY") wakeCost = 2;
-  else if(A==="LIGHT" && B==="JUMBO") wakeCost = 3;
-
-  // ---------------- ROUTE / FLOW ----------------
+  // ROUTE
   let routeCost = 0;
 
   if(dir(a) === dir(b)) routeCost = 2;
@@ -179,53 +143,26 @@ function cost(a,b){
   if(a.rwy==="06" && a.route==="MARIO")
     routeCost = Math.max(routeCost,2);
 
-  const separationCost = Math.max(wakeCost, routeCost);
+  // FIX: ADDITION statt MAX
+  const separationCost = wakeCost + routeCost;
 
-  // ---------------- INTERSECTION (ONLY B, NO BACK-PROPAGATION) ----------------
+  // INTERSECTION
   let intersectionCost = 0;
 
-  if(isIntersectionDeparture(b)){
-
+  if(["A6","B4","A3","A4"].includes(b.intersection)){
     intersectionCost = 1;
-
-    if(wake(b.type)==="LIGHT" && separationCost > 0){
-      intersectionCost = 2;
-    }
   }
 
   return separationCost + intersectionCost;
 }
 
-// ---------------- GLOBAL SEQUENCE EVALUATION ----------------
+// ---------------- EVALUATION ----------------
 function evaluateSequence(arr){
 
   let total = 0;
 
   for(let i=0;i<arr.length-1;i++){
     total += cost(arr[i], arr[i+1]);
-  }
-
-  // smooth flow penalty
-  for(let i=0;i<arr.length-2;i++){
-
-    const a = arr[i];
-    const b = arr[i+1];
-    const c = arr[i+2];
-
-    const gA = routeGroup(a);
-    const gB = routeGroup(b);
-    const gC = routeGroup(c);
-
-    if(gA > gB && gB < gC){
-      total += 2;
-    }
-  }
-
-  // stability reward
-  for(let i=0;i<arr.length-1;i++){
-    if(routeGroup(arr[i]) === routeGroup(arr[i+1])){
-      total -= 1;
-    }
   }
 
   return total;
@@ -276,12 +213,20 @@ function generate(){
   let rwy = rand(runways);
 
   for(let i=0;i<6;i++){
+
+    let type = rand(types);
+    let route = rand(routes);
+
     order.push({
       id: rand(airlines)+Math.floor(Math.random()*900),
-      type: rand(types),
+      type: type,
       rwy: rwy,
-      route: rand(routes),
-      intersection: getAllowedIntersections({type: rand(types), rwy: rwy, route: rand(routes)})[0]
+      route: route,
+      intersection: getAllowedIntersections({
+        type: type,
+        rwy: rwy,
+        route: route
+      })[0]
     });
   }
 
@@ -301,7 +246,7 @@ function render(){
 
     div.innerHTML=
       `<b>${f.id}</b><br>
-      RWY: ${f.rwy} | ${f.type} | ${wake(f.type)}<br>
+      RWY: ${f.rwy} | ${f.type}<br>
       Route: ${f.route}`;
 
     const sel=document.createElement("select");
@@ -352,7 +297,7 @@ function check(){
 
     div.innerHTML=
       `<b>${f.id}</b><br>
-      TYPE: ${f.type} | RWY: ${f.rwy} | ${wake(f.type)}`;
+      TYPE: ${f.type} | RWY: ${f.rwy}`;
 
     list.appendChild(div);
   });
